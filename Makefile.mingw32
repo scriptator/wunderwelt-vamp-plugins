@@ -1,0 +1,20 @@
+
+TOOLPREFIX     ?= i586-mingw32msvc-
+CXX		= $(TOOLPREFIX)g++
+CC		= $(TOOLPREFIX)gcc
+LD		= $(TOOLPREFIX)g++
+AR		= $(TOOLPREFIX)ar
+RANLIB		= $(TOOLPREFIX)ranlib
+
+VAMPSDK_DIR	?= ../vamp-plugin-sdk
+
+CXXFLAGS	:= -Wall -Wextra -Werror -I$(VAMPSDK_DIR) $(ARCHFLAGS)
+
+PLUGIN_EXT	:= .dll
+
+PLUGIN_LDFLAGS	:= $(LDFLAGS) -shared -static -Wl,--retain-symbols-file=vamp-plugin.list $(VAMPSDK_DIR)/libvamp-sdk.a
+
+MAKEFILE_EXT 	:= .mingw32
+
+include Makefile.inc
+
