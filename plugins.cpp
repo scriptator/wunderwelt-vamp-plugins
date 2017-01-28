@@ -4,25 +4,42 @@
 #include <vamp-sdk/PluginAdapter.h>
 
 #include "AmplitudeFollower.hpp"
+#include "vamp-test-plugin.hpp"
 
-class Adapter : public Vamp::PluginAdapterBase
+class TestAdapter : public Vamp::PluginAdapterBase
 {
 public:
-    Adapter(bool freq):
+    TestAdapter(bool freq):
         PluginAdapterBase(),
         m_freq(freq) { }
     
-    virtual ~Adapter() { }
+    virtual ~TestAdapter() { }
     
 protected:
     bool m_freq;
     
     Vamp::Plugin *createPlugin(float inputSampleRate) {
+        return new VampTestPlugin(inputSampleRate, m_freq);
+    }
+};
+
+class AmplitudeAdapter : public Vamp::PluginAdapterBase
+{
+public:
+    AmplitudeAdapter():
+    PluginAdapterBase() { }
+    
+    virtual ~AmplitudeAdapter() { }
+    
+protected:
+    Vamp::Plugin *createPlugin(float inputSampleRate) {
         return new AmplitudeFollower(inputSampleRate);
     }
 };
 
-static Adapter amplitudeFollower(false);
+static AmplitudeAdapter amplitudeFollower;
+static TestAdapter timeAdapter(false);
+static TestAdapter freqAdapter(true);
 
 const VampPluginDescriptor *
 vampGetPluginDescriptor(unsigned int version, unsigned int index)
@@ -36,6 +53,8 @@ vampGetPluginDescriptor(unsigned int version, unsigned int index)
     
     switch (index) {
         case  0: return amplitudeFollower.getDescriptor();
+        case  1: return timeAdapter.getDescriptor();
+        case  2: return freqAdapter.getDescriptor();
         default: return 0;
     }
 }

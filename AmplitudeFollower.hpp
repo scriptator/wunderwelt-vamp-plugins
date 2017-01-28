@@ -51,10 +51,12 @@ public:
     FeatureSet getRemainingFeatures();
     
 private:
+    size_t m_blocksProcessed;
     size_t m_channels;
     size_t m_stepSize;
     size_t m_blockSize;
     mutable std::map<std::string, int> m_outputNumbers;
+    FeatureSet m_featureSet;
 };
 
 #endif /* amplitude_follower_hpp */
