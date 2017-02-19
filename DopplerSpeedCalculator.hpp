@@ -6,8 +6,8 @@
 //  Copyright © 2017 Johannes Vass. All rights reserved.
 //
 
-#ifndef amplitude_follower_hpp
-#define amplitude_follower_hpp
+#ifndef doppler_speed_calculator_hpp
+#define doppler_speed_calculator_hpp
 
 #include <stdio.h>
 #include <vamp-sdk/Plugin.h>
@@ -59,4 +59,4 @@ private:
     FeatureSet m_featureSet;
 };
 
-#endif /* amplitude_follower_hpp */
+#endif /* doppler_speed_calculator_hpp */
