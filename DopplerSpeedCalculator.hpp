@@ -11,6 +11,8 @@
 
 #include <stdio.h>
 #include <vamp-sdk/Plugin.h>
+#include <iostream>
+#include <fstream>
 
 using std::string;
 
@@ -18,7 +20,7 @@ class DopplerSpeedCalculator : public Vamp::Plugin {
 
 public:
     DopplerSpeedCalculator(float inputSampleRate);
-    
+
     string getIdentifier() const;
     string getName() const;
     string getDescription() const;
@@ -52,11 +54,18 @@ public:
     
 private:
     size_t m_blocksProcessed;
-    size_t m_channels;
     size_t m_stepSize;
     size_t m_blockSize;
+    mutable std::map<float, std::vector<float>*> m_frequencyTimeline;
     mutable std::map<std::string, int> m_outputNumbers;
     FeatureSet m_featureSet;
+    
+    float getFrequencyForBin(size_t bin) {
+        return this->m_inputSampleRate * bin / this->m_blockSize;
+    };
+    
+    std::ofstream csvfile;
+
 };
 
 #endif /* doppler_speed_calculator_hpp */
