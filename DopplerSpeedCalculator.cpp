@@ -7,6 +7,7 @@
 //
 
 #include "DopplerSpeedCalculator.hpp"
+#include "PeakFinder.hpp"
 #include <vamp-sdk/FFT.h>
 
 #include <iostream>
@@ -156,6 +157,8 @@ bool DopplerSpeedCalculator::initialise(size_t channels, size_t stepSize, size_t
     }
     
     csvfile = std::ofstream("/Users/johannesvass/Desktop/fft.csv");
+    refile = std::ofstream("/Users/johannesvass/Desktop/re.csv");
+    imfile = std::ofstream("/Users/johannesvass/Desktop/im.csv");
     
     return true;
 }
@@ -173,26 +176,31 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     float curFreq = 0;
     float curMag = 0;
     const float *const inputBuffer = inputBuffers[CHANNEL];
-    
-    auto currentData = std::vector<std::pair<float,float>>();
-    
+    vector<float> currentData = vector<float>();
+
     // 0 Hz term, equivalent to the average of all the samples in the window
-    complex<float> dcTerm = complex<float>(inputBuffer[0], inputBuffer[1]);
+    // complex<float> dcTerm = complex<float>(inputBuffer[0], inputBuffer[1]);
     
     for (size_t i = 2; i < m_blockSize + 2; i+=2) {
-        curMag = sqrt(inputBuffer[i]*inputBuffer[i] + inputBuffer[i+1]*inputBuffer[i+1]);
+        curMag = calcNormalizedMagnitude(inputBuffer[i], inputBuffer[i+1]);
         curMag = 20 * log10(curMag);
+        csvfile << curMag << ";";
+        refile << inputBuffer[i] << ";";
+        imfile << inputBuffer[i+1] << ";";
         curFreq = getFrequencyForBin(i/2);
         m_frequencyTimeline[curFreq]->push_back(curMag);
-        currentData.push_back(std::pair<float,float>(curMag, curFreq));
+        currentData.push_back(curMag);
     }
+    csvfile << "\n";
+    refile << "\n";
+    imfile << "\n";
     
-    // find out the 5 loudest frequencies
-    std::sort(currentData.rbegin(), currentData.rend());
-    for (auto it=currentData.begin(); it < currentData.begin() + 8; ++it) {
-        f.values.push_back(it->second);
+    auto peaks = PeakFinder::findPeaksNaive(currentData.begin(), currentData.end(), 5);
+    for (auto it=peaks.begin(); it < peaks.end(); ++it) {
+        size_t bin = it->first;
+        f.values.push_back(getFrequencyForBin(bin));
     }
-    
+
     // put the feature into the feature set
     FeatureSet fs;
     fs[m_outputNumbers["dominating-frequencies"]].push_back(f);

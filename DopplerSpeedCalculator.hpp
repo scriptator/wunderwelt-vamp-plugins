@@ -64,7 +64,13 @@ private:
         return this->m_inputSampleRate * bin / this->m_blockSize;
     };
     
+    template<typename T> float calcNormalizedMagnitude(T re, T im) {
+        return sqrt(re*re + im*im) * 2 / (this->m_blockSize);
+    };
+    
     std::ofstream csvfile;
+    std::ofstream refile;
+    std::ofstream imfile;
 
 };
 
