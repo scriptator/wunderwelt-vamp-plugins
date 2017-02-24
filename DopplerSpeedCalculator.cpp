@@ -223,7 +223,7 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     }
     csvfile << "\n";
     
-    auto peaks = PeakFinder::findPeaksNaive(currentData.begin(), currentData.end(), 5);
+    auto peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 10.0f);
     for (auto it=peaks.begin(); it < peaks.end(); ++it) {
         size_t bin = it->first;
         f.values.push_back(getFrequencyForBin(bin));
