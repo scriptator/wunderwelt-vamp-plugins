@@ -25,6 +25,9 @@ using Vamp::RealTime;
 
 #define CHANNEL 0
 
+// Parameter Identifiers
+#define DEBUG_CSV_FILES "write-debug-csv"
+
 DopplerSpeedCalculator::DopplerSpeedCalculator (float inputSampleRate) :
     Vamp::Plugin(inputSampleRate),
     m_blocksProcessed(0),
@@ -32,7 +35,14 @@ DopplerSpeedCalculator::DopplerSpeedCalculator (float inputSampleRate) :
     m_blockSize(0),
     m_outputNumbers({}),
     m_featureSet(FeatureSet())
-    {}
+{
+    // initialize parameters with default values
+    ParameterList parameters = this->getParameterDescriptors();
+    for (auto it=parameters.begin(); it < parameters.end(); ++it) {
+        ParameterDescriptor& desc = *it;
+        this->m_parameterValues[desc.identifier] = desc.defaultValue;
+    }
+}
 
 string DopplerSpeedCalculator::getIdentifier() const {
     return "doppler-speed-calculator";
@@ -78,17 +88,30 @@ size_t DopplerSpeedCalculator::getMaxChannelCount() const {
     return 1;
 }
 
-DopplerSpeedCalculator::ParameterList DopplerSpeedCalculator::getParameterDescriptors() const
-{
-    ParameterList list;
-    return list;
+DopplerSpeedCalculator::ParameterList DopplerSpeedCalculator::getParameterDescriptors() const {
+    ParameterList plist = ParameterList();
+    
+    ParameterDescriptor desc = ParameterDescriptor();
+    desc.identifier = DEBUG_CSV_FILES;
+    desc.name = "Debug CSV Files";
+    desc.description = "Set to 1 if you want Debug CSV Files to be written to your home directory";
+    desc.defaultValue = 0;
+    desc.quantizeStep = 1.0f;
+    desc.isQuantized = true;
+    desc.minValue = 0;
+    desc.maxValue = 1;
+    desc.valueNames = std::vector<std::string>{"off", "on"};
+    plist.push_back(std::move(desc));
+    
+    return plist;
 }
 
 float DopplerSpeedCalculator::getParameter(string identifier) const {
-    return 0;
+    return this->m_parameterValues.at(identifier);
 }
 
 void DopplerSpeedCalculator::setParameter(string identifier, float value) {
+    this->m_parameterValues[identifier] = value;
 }
 
 DopplerSpeedCalculator::ProgramList DopplerSpeedCalculator::getPrograms() const {
@@ -156,9 +179,14 @@ bool DopplerSpeedCalculator::initialise(size_t channels, size_t stepSize, size_t
         m_frequencyTimeline[getFrequencyForBin(i)] = new std::vector<float>;
     }
 
-    // open the debug csv file for writing
-    csvfile = std::ofstream("/Users/johannesvass/Desktop/fft.csv");
-    
+    if (this->getParameter(DEBUG_CSV_FILES)) {
+        // open the debug csv file for writing
+        csvfile = std::ofstream("~/fft.csv");
+    } else {
+        csvfile = std::ofstream(0);
+    }
+
+    m_blocksProcessed++;
     return true;
 }
 
