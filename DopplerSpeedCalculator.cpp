@@ -155,10 +155,9 @@ bool DopplerSpeedCalculator::initialise(size_t channels, size_t stepSize, size_t
     for (size_t i = 0; i <= m_blockSize / 2; ++i) {
         m_frequencyTimeline[getFrequencyForBin(i)] = new std::vector<float>;
     }
-    
+
+    // open the debug csv file for writing
     csvfile = std::ofstream("/Users/johannesvass/Desktop/fft.csv");
-    refile = std::ofstream("/Users/johannesvass/Desktop/re.csv");
-    imfile = std::ofstream("/Users/johannesvass/Desktop/im.csv");
     
     return true;
 }
@@ -185,15 +184,11 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
         curMag = calcNormalizedMagnitude(inputBuffer[i], inputBuffer[i+1]);
         curMag = 20 * log10(curMag);
         csvfile << curMag << ";";
-        refile << inputBuffer[i] << ";";
-        imfile << inputBuffer[i+1] << ";";
         curFreq = getFrequencyForBin(i/2);
         m_frequencyTimeline[curFreq]->push_back(curMag);
         currentData.push_back(curMag);
     }
     csvfile << "\n";
-    refile << "\n";
-    imfile << "\n";
     
     auto peaks = PeakFinder::findPeaksNaive(currentData.begin(), currentData.end(), 5);
     for (auto it=peaks.begin(); it < peaks.end(); ++it) {

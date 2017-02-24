@@ -52,6 +52,17 @@ public:
     
     FeatureSet getRemainingFeatures();
     
+    /// calculates the center frequency of a bin (i.e. the index of the bin)
+    float getFrequencyForBin(size_t bin) {
+        return this->m_inputSampleRate * bin / this->m_blockSize;
+    };
+    
+    /// Calculates the normalized magnitude given a complex number
+    /// formula reference https://groups.google.com/d/msg/comp.dsp/cZsS1ftN5oI/rEjHXKTxgv8J
+    template<typename T> float calcNormalizedMagnitude(T re, T im) {
+        return sqrt(re*re + im*im) * 2 / (this->m_blockSize);
+    };
+    
 private:
     size_t m_blocksProcessed;
     size_t m_stepSize;
@@ -59,18 +70,9 @@ private:
     mutable std::map<float, std::vector<float>*> m_frequencyTimeline;
     mutable std::map<std::string, int> m_outputNumbers;
     FeatureSet m_featureSet;
-    
-    float getFrequencyForBin(size_t bin) {
-        return this->m_inputSampleRate * bin / this->m_blockSize;
-    };
-    
-    template<typename T> float calcNormalizedMagnitude(T re, T im) {
-        return sqrt(re*re + im*im) * 2 / (this->m_blockSize);
-    };
-    
+
+    /// csv files for debug purposes which get (over)written on every execution
     std::ofstream csvfile;
-    std::ofstream refile;
-    std::ofstream imfile;
 
 };
 
