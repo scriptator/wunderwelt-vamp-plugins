@@ -185,7 +185,7 @@ bool DopplerSpeedCalculator::initialise(size_t channels, size_t stepSize, size_t
         csvfile = std::ofstream(0);
     }
 
-    for (size_t i = 0; i <= m_blockSize / 2; ++i) {
+    for (size_t i = 1; i <= m_blockSize / 2; ++i) {
         float freq = getFrequencyForBin(i);
         m_frequencyTimeline[freq] = new std::vector<float>;
         csvfile<< freq << " Hz;";
