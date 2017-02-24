@@ -13,6 +13,7 @@
 #include <vamp-sdk/Plugin.h>
 #include <iostream>
 #include <fstream>
+#include <complex>
 
 using std::string;
 
@@ -54,13 +55,13 @@ public:
     
     /// calculates the center frequency of a bin (i.e. the index of the bin)
     float getFrequencyForBin(size_t bin) {
-        return this->m_inputSampleRate * bin / this->m_blockSize;
+        return (1.0f * this->m_inputSampleRate * bin) / this->m_blockSize;
     };
     
     /// Calculates the normalized magnitude given a complex number
     /// formula reference https://groups.google.com/d/msg/comp.dsp/cZsS1ftN5oI/rEjHXKTxgv8J
-    template<typename T> float calcNormalizedMagnitude(T re, T im) {
-        return sqrt(re*re + im*im) * 2 / (this->m_blockSize);
+    template<typename T> float calcNormalizedMagnitude(std::complex<T> complexVal) {
+        return std::abs(complexVal) * 2 / (this->m_blockSize);
     };
     
 private:

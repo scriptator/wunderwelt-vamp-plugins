@@ -175,18 +175,23 @@ bool DopplerSpeedCalculator::initialise(size_t channels, size_t stepSize, size_t
     m_stepSize = stepSize;
     m_blockSize = blockSize;
     
-    for (size_t i = 0; i <= m_blockSize / 2; ++i) {
-        m_frequencyTimeline[getFrequencyForBin(i)] = new std::vector<float>;
-    }
-
     if (this->getParameter(DEBUG_CSV_FILES)) {
         // open the debug csv file for writing
-        csvfile = std::ofstream("~/fft.csv");
+        csvfile = std::ofstream("fft.csv");
+        if (csvfile.fail()) {
+            std::cerr << "WARNING: could not open debug csv file\n";
+        }
     } else {
         csvfile = std::ofstream(0);
     }
 
-    m_blocksProcessed++;
+    for (size_t i = 0; i <= m_blockSize / 2; ++i) {
+        float freq = getFrequencyForBin(i);
+        m_frequencyTimeline[freq] = new std::vector<float>;
+        csvfile<< freq << " Hz;";
+    }
+    csvfile << "\n";
+
     return true;
 }
 
@@ -209,7 +214,7 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     // complex<float> dcTerm = complex<float>(inputBuffer[0], inputBuffer[1]);
     
     for (size_t i = 2; i < m_blockSize + 2; i+=2) {
-        curMag = calcNormalizedMagnitude(inputBuffer[i], inputBuffer[i+1]);
+        curMag = calcNormalizedMagnitude(std::complex<float>(inputBuffer[i], inputBuffer[i+1]));
         curMag = 20 * log10(curMag);
         csvfile << curMag << ";";
         curFreq = getFrequencyForBin(i/2);
@@ -227,6 +232,8 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     // put the feature into the feature set
     FeatureSet fs;
     fs[m_outputNumbers["dominating-frequencies"]].push_back(f);
+
+    m_blocksProcessed++;
     return fs;
 }
 
