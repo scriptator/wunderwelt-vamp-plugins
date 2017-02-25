@@ -226,11 +226,10 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     auto peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 15.0f);
     
     for (auto it=peaks.begin(); it < peaks.end(); ++it) {
-        size_t bin = it->first;
-        float freq = getFrequencyForBin(bin);
+        float position = it->interpolatedPosition;
+        float freq = getFrequencyForBin(position);
         if (freq < UPPER_THRESHOLD_FREQUENCY) {
             f.values.push_back(freq);
-            m_frequencyTimeline[freq]
         }
     }
 

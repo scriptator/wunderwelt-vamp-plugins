@@ -53,8 +53,8 @@ public:
     
     FeatureSet getRemainingFeatures();
     
-    /// calculates the center frequency of a bin (i.e. the index of the bin)
-    float getFrequencyForBin(size_t bin) {
+    /// calculates the center frequency of a bin (i.e. the index of the bin or an interpolated value inbetween)
+    template<typename T> float getFrequencyForBin(T bin) {
         return (1.0f * this->m_inputSampleRate * bin) / this->m_blockSize;
     };
     
