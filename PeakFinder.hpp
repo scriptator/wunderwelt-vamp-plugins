@@ -63,14 +63,13 @@ std::vector<std::pair<size_t, T>> PeakFinder::findPeaksThreshold(Iterator begin,
 
     SignalDirection direction = stagnating;
     size_t index = 0;
-    pair<size_t, T> lastPeak;
-    pair<size_t, T> lastValley;
-
-    pair<size_t, T> candidate;
-    bool validCandidate = false;
 
     T previous = *begin;
     T current;
+    
+    pair<size_t, T> lastValley = pair<size_t, T>(0, previous);
+    pair<size_t, T> candidate;
+    bool validCandidate = false;
 
     for (auto it = begin; it < end; ++it) {
         current = *it;
@@ -82,14 +81,16 @@ std::vector<std::pair<size_t, T>> PeakFinder::findPeaksThreshold(Iterator begin,
                 validCandidate = true;
             }
         } else if (current > previous) {
-            direction = ascending;
-            lastValley.first = index - 1;
-            lastValley.second = previous;
-            if (validCandidate && candidate.second - previous > threshold) {
-                lastPeak = candidate;
-                outputBuffer.push_back(candidate);
+            if (direction != ascending) {
+                direction = ascending;
+                lastValley.first = index - 1;
+                lastValley.second = previous;
+
+                if (validCandidate && candidate.second - previous > threshold) {
+                    outputBuffer.push_back(candidate);
+                }
+                validCandidate = false;
             }
-            validCandidate = false;
         } else {
             direction = stagnating;
         }

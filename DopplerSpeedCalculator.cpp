@@ -28,6 +28,8 @@ using Vamp::RealTime;
 // Parameter Identifiers
 #define DEBUG_CSV_FILES "write-debug-csv"
 
+#define UPPER_THRESHOLD_FREQUENCY 3000
+
 DopplerSpeedCalculator::DopplerSpeedCalculator (float inputSampleRate) :
     Vamp::Plugin(inputSampleRate),
     m_blocksProcessed(0),
@@ -138,8 +140,6 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
     d.name = "Dominating Frequencies";
     d.description = "Returns the 5 most dominating frequencies per step";
     d.unit = "Hz";
-    d.hasFixedBinCount = true;
-    d.binCount = 5;
     d.hasKnownExtents = true;
     d.minValue = 0;
     d.maxValue = this->m_inputSampleRate / 2; // Nyquist Frequency
@@ -223,10 +223,15 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     }
     csvfile << "\n";
     
-    auto peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 10.0f);
+    auto peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 15.0f);
+    
     for (auto it=peaks.begin(); it < peaks.end(); ++it) {
         size_t bin = it->first;
-        f.values.push_back(getFrequencyForBin(bin));
+        float freq = getFrequencyForBin(bin);
+        if (freq < UPPER_THRESHOLD_FREQUENCY) {
+            f.values.push_back(freq);
+            m_frequencyTimeline[freq]
+        }
     }
 
     // put the feature into the feature set

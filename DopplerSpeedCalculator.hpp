@@ -68,7 +68,7 @@ private:
     size_t m_blocksProcessed;
     size_t m_stepSize;
     size_t m_blockSize;
-    mutable std::map<float, std::vector<float>*> m_frequencyTimeline;
+    std::map<float, std::vector<float>*> m_frequencyTimeline;
     mutable std::map<std::string, int> m_outputNumbers;
     std::map<std::string, float> m_parameterValues;
 
