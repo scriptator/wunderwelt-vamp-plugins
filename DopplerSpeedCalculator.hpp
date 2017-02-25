@@ -95,7 +95,7 @@ private:
     _VampPlugin::Vamp::RealTime stableEnd;
 
     // store the history of all found peaks
-    std::vector<std::vector<PeakFinder::Peak<float>>> peakMatrix;
+    std::vector<std::vector<PeakFinder::Peak<float>*>> peakMatrix;
     std::vector<PeakHistory<float>> peakHistories;
 
     /// csv files for debug purposes which get (over)written on every execution

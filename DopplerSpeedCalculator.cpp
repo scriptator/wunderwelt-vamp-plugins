@@ -213,14 +213,15 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     csvfile << "\n";
     
     // find all peaks with relatively small threshold amplitude first
-    std::vector<PeakFinder::Peak<float>> peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 8.0f);
+    std::vector<PeakFinder::Peak<float>*> peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 8.0f);
     
     // iterate and throw those lower than a threshold frequency into the "dominating-frequencies" feature
     Feature f;
     for (auto it=peaks.begin(); it < peaks.end(); ++it) {
-        double position = it->interpolatedPosition;
+        PeakFinder::Peak<float> *peak = *it;
+        double position = peak->interpolatedPosition;
         float freq = getFrequencyForBin(position);
-        if (freq < UPPER_THRESHOLD_FREQUENCY && it->height >= 15.0f) {
+        if (freq < UPPER_THRESHOLD_FREQUENCY && peak->height >= 15.0f) {
             f.values.push_back(freq);
         }
     }
@@ -242,8 +243,8 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures(
 
     vector<float>& speedCalculations = f.values;
     for (auto it = this->peakHistories.begin(); it < this->peakHistories.end(); ++it) {
-        float approachingFreq = getFrequencyForBin(it->getFirst().interpolatedPosition);
-        float leavingFreq = getFrequencyForBin(it->getLast().interpolatedPosition);
+        float approachingFreq = getFrequencyForBin(it->getFirst()->interpolatedPosition);
+        float leavingFreq = getFrequencyForBin(it->getLast()->interpolatedPosition);
         float speed = dopplerSpeedMovingSource(approachingFreq, leavingFreq);
         speedCalculations.push_back(speed);
     }

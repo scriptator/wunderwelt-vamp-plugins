@@ -17,20 +17,29 @@ template<typename T> class PeakHistory {
 public:
     PeakHistory();
 
-    void addPeak(const PeakFinder::Peak<T>& peak);
+    void addPeak(const PeakFinder::Peak<T> *peak);
+    
+    void noPeak() {
+        this->peaks.push_back(nullptr);
+    }
+
+    bool isAlive() const {
+        return this->alive;
+    }
 
     void getInterpolatedPositionHistory(std::vector<double>& resultVector) const;
 
-    PeakFinder::Peak<T> getFirst() const {
+    PeakFinder::Peak<T>* getFirst() const {
         return this->peaks.at(0);
     }
 
-    PeakFinder::Peak<T> getLast() const {
+    PeakFinder::Peak<T>* getLast() const {
         return this->peaks.at(peaks.size() - 1);
     }
 
 private:
-    const std::vector<PeakFinder::Peak<T>> peaks;
+    std::vector<PeakFinder::Peak<T> *> peaks;
+    bool alive;
 };
 
 #endif /* PeakHistory_hpp */

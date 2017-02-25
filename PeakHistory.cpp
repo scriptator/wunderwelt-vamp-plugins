@@ -9,10 +9,11 @@
 #include "PeakHistory.hpp"
 
 template<typename T> PeakHistory<T>::PeakHistory():
-    peaks(std::vector<PeakFinder::Peak<T>>()) {
+    peaks(std::vector<PeakFinder::Peak<T>*>()),
+    alive(true) {
 };
 
-template<typename T> void PeakHistory<T>::addPeak(const PeakFinder::Peak<T>& peak) {
+template<typename T> void PeakHistory<T>::addPeak(const PeakFinder::Peak<T> *peak) {
     this->peaks.emplace_back(peak);
 }
 
