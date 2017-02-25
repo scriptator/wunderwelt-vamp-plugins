@@ -15,7 +15,19 @@
 #include <fstream>
 #include <complex>
 
+#include "PeakFinder.hpp"
+#include "PeakHistory.hpp"
+
+#define SPEED_OF_SOUND 343
+
 using std::string;
+
+/// Calculates the speed of a moving source relative to a still measuring point given a before-frequency and an after-frequency.
+/// The frequencies may be in any unit, the speed is returned in km/h
+template<typename T> static T dopplerSpeedMovingSource(T approachingFreq, T leavingFreq) {
+    T speedInMetersPerSecond = (approachingFreq - leavingFreq) / (approachingFreq + leavingFreq) * SPEED_OF_SOUND; // in m/s
+    return speedInMetersPerSecond * 3.6;    // in km/h
+}
 
 class DopplerSpeedCalculator : public Vamp::Plugin {
 
@@ -63,16 +75,28 @@ public:
     template<typename T> float calcNormalizedMagnitude(std::complex<T> complexVal) {
         return std::abs(complexVal) * 2 / (this->m_blockSize);
     };
-    
+
+    enum CarState {
+        UNKNOWN,
+        APPROACHING_STABLE,
+        UNSTABLE,
+        LEAVING_STABLE
+    };
+
 private:
     size_t m_blocksProcessed;
     size_t m_stepSize;
     size_t m_blockSize;
-    std::map<float, std::vector<float>*> m_frequencyTimeline;
     mutable std::map<std::string, int> m_outputNumbers;
     std::map<std::string, float> m_parameterValues;
 
-    FeatureSet m_featureSet;
+    CarState carState;
+    _VampPlugin::Vamp::RealTime stableBegin;
+    _VampPlugin::Vamp::RealTime stableEnd;
+
+    // store the history of all found peaks
+    std::vector<std::vector<PeakFinder::Peak<float>>> peakMatrix;
+    std::vector<PeakHistory<float>> peakHistories;
 
     /// csv files for debug purposes which get (over)written on every execution
     std::ofstream csvfile;

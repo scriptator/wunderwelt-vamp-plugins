@@ -20,6 +20,12 @@ namespace PeakFinder {
         T height;
         size_t position;
         double interpolatedPosition;
+
+        Peak<T>(): value(-1), height(-1), position(-1), interpolatedPosition(-1) {}
+
+        Peak<T>(const Peak<T> & other):
+            value(other.value), height(other.height), position(other.position), interpolatedPosition(other.interpolatedPosition)
+        { }
     };
 
     // naively find peaks by returning the n biggest elements
@@ -30,6 +36,11 @@ namespace PeakFinder {
     template <class Iterator, class T = typename std::iterator_traits<Iterator>::value_type>
     std::vector<Peak<T>> findPeaksThreshold(Iterator begin, Iterator end, T threshold);
 
+    enum SignalDirection {
+        ascending,
+        descending,
+        stagnating
+    };
 }
 
 /////////// implementation of template functions
@@ -56,12 +67,6 @@ std::vector<std::pair<size_t, T>> PeakFinder::findPeaksNaive(Iterator begin, Ite
     return outputBuffer;
 }
 
-enum SignalDirection {
-    ascending,
-    descending,
-    stagnating
-};
-
 template <class Iterator, class T>
 std::vector<PeakFinder::Peak<T>> PeakFinder::findPeaksThreshold(Iterator begin, Iterator end, T threshold) {
     vector<PeakFinder::Peak<T>> outputBuffer;
@@ -81,29 +86,33 @@ std::vector<PeakFinder::Peak<T>> PeakFinder::findPeaksThreshold(Iterator begin, 
         current = *it;
 
         if (current < previous) {
-            direction = descending;
-            height = previous - lastValley.second;
-            if (height > threshold) {
-                double interpolatedPosition = index - 1;
-                candidate = PeakFinder::Peak<T>
-                    {.value=previous, .height=height, .position=index-1, .interpolatedPosition=interpolatedPosition};
-                validCandidate = true;
+            if (direction != SignalDirection::descending) {
+                direction = SignalDirection::descending;
+                height = previous - lastValley.second;
+                if (height >= threshold) {
+                    double interpolatedPosition = index - 1;
+                    candidate.value = previous;
+                    candidate.height = height;
+                    candidate.position = index - 1;
+                    candidate.interpolatedPosition = interpolatedPosition;
+                    validCandidate = true;
+                }
             }
         } else if (current > previous) {
-            if (direction != ascending) {
-                direction = ascending;
+            if (direction != SignalDirection::ascending) {
+                direction = SignalDirection::ascending;
                 lastValley.first = index - 1;
                 lastValley.second = previous;
 
                 height = candidate.value - previous;
-                if (validCandidate && height > threshold) {
+                if (validCandidate && height >= threshold) {
                     candidate.height = std::min(candidate.height, height);
                     outputBuffer.push_back(candidate);
                 }
                 validCandidate = false;
             }
         } else {
-            direction = stagnating;
+            direction = SignalDirection::stagnating;
         }
 
         previous = current;

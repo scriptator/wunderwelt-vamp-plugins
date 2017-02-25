@@ -7,7 +7,6 @@
 //
 
 #include "DopplerSpeedCalculator.hpp"
-#include "PeakFinder.hpp"
 #include <vamp-sdk/FFT.h>
 
 #include <iostream>
@@ -32,11 +31,11 @@ using Vamp::RealTime;
 
 DopplerSpeedCalculator::DopplerSpeedCalculator (float inputSampleRate) :
     Vamp::Plugin(inputSampleRate),
+    carState(CarState::UNKNOWN),
     m_blocksProcessed(0),
     m_stepSize(0),
     m_blockSize(0),
-    m_outputNumbers({}),
-    m_featureSet(FeatureSet())
+    m_outputNumbers({})
 {
     // initialize parameters with default values
     ParameterList parameters = this->getParameterDescriptors();
@@ -75,11 +74,11 @@ DopplerSpeedCalculator::InputDomain DopplerSpeedCalculator::getInputDomain() con
 }
 
 size_t DopplerSpeedCalculator::getPreferredBlockSize() const {
-    return 4096;
+    return 8192;
 }
 
 size_t DopplerSpeedCalculator::getPreferredStepSize() const {
-    return 0;
+    return 1024;
 }
 
 size_t DopplerSpeedCalculator::getMinChannelCount() const {
@@ -149,22 +148,21 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
     m_outputNumbers[d.identifier] = n++;
     list.push_back(d);
     
-//    d.identifier = "naive-speed-of-source";
-//    d.name = "Speed of noise-emitting source";
-//    d.description = "Returns the speed of the noise-emitting source in m/s by calculating it directly from the frequency difference "
-//    "between the beginning and end of the event. This means it is negligent of the normal distance between measuring point and "
-//    "route of the source. Returns exactly one value per detected event.";
-//    d.unit = "m/s";
-//    d.hasFixedBinCount = true;
-//    d.binCount = 1;
-//    d.hasKnownExtents = false;
-//    d.isQuantized = false;
-//    d.sampleType = OutputDescriptor::VariableSampleRate;
-//    d.hasDuration = true;
-//    m_outputNumbers[d.identifier] = n++;
-//    list.push_back(d);
+    d.identifier = "naive-speed-of-source";
+    d.name = "Speed of noise-emitting source";
+    d.description = "Returns the speed of the noise-emitting source in m/s by calculating it directly from the frequency difference "
+    "between the beginning and end of the event. This means it is negligent of the normal distance between measuring point and "
+    "route of the source. Returns exactly one value per detected event.";
+    d.unit = "m/s";
+    d.hasFixedBinCount = true;
+    d.binCount = 1;
+    d.hasKnownExtents = false;
+    d.isQuantized = false;
+    d.sampleType = OutputDescriptor::VariableSampleRate;
+    d.hasDuration = true;
+    m_outputNumbers[d.identifier] = n++;
+    list.push_back(d);
 
-    
     return list;
 }
 
@@ -187,7 +185,6 @@ bool DopplerSpeedCalculator::initialise(size_t channels, size_t stepSize, size_t
 
     for (size_t i = 1; i <= m_blockSize / 2; ++i) {
         float freq = getFrequencyForBin(i);
-        m_frequencyTimeline[freq] = new std::vector<float>;
         csvfile<< freq << " Hz;";
     }
     csvfile << "\n";
@@ -200,12 +197,6 @@ void DopplerSpeedCalculator::reset() {
 }
 
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *const *inputBuffers, RealTime timestamp) {
-    Feature f;
-    f.hasTimestamp = true;
-    f.timestamp = timestamp;
-    
-
-    float curFreq = 0;
     float curMag = 0;
     const float *const inputBuffer = inputBuffers[CHANNEL];
     vector<float> currentData = vector<float>();
@@ -217,32 +208,49 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
         curMag = calcNormalizedMagnitude(std::complex<float>(inputBuffer[i], inputBuffer[i+1]));
         curMag = 20 * log10(curMag);
         csvfile << curMag << ";";
-        curFreq = getFrequencyForBin(i/2);
-        m_frequencyTimeline[curFreq]->push_back(curMag);
         currentData.push_back(curMag);
     }
     csvfile << "\n";
     
-    auto peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 15.0f);
+    // find all peaks with relatively small threshold amplitude first
+    std::vector<PeakFinder::Peak<float>> peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 8.0f);
     
+    // iterate and throw those lower than a threshold frequency into the "dominating-frequencies" feature
+    Feature f;
     for (auto it=peaks.begin(); it < peaks.end(); ++it) {
-        float position = it->interpolatedPosition;
+        double position = it->interpolatedPosition;
         float freq = getFrequencyForBin(position);
-        if (freq < UPPER_THRESHOLD_FREQUENCY) {
+        if (freq < UPPER_THRESHOLD_FREQUENCY && it->height >= 15.0f) {
             f.values.push_back(freq);
         }
     }
-
-    // put the feature into the feature set
     FeatureSet fs;
     fs[m_outputNumbers["dominating-frequencies"]].push_back(f);
-
+    
+    this->stableBegin = timestamp;
+    this->stableEnd = timestamp;
     m_blocksProcessed++;
     return fs;
 }
 
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures() {
+    // put the feature into the feature set
     FeatureSet fs;
+    Feature f;
+    f.timestamp = this->stableBegin;
+    f.duration = this->stableEnd - this->stableBegin;
+
+    vector<float>& speedCalculations = f.values;
+    for (auto it = this->peakHistories.begin(); it < this->peakHistories.end(); ++it) {
+        float approachingFreq = getFrequencyForBin(it->getFirst().interpolatedPosition);
+        float leavingFreq = getFrequencyForBin(it->getLast().interpolatedPosition);
+        float speed = dopplerSpeedMovingSource(approachingFreq, leavingFreq);
+        speedCalculations.push_back(speed);
+    }
+    std::sort(speedCalculations.begin(), speedCalculations.end());
+
+    fs[m_outputNumbers["naive-speed-of-source"]].push_back(f);
+
     return fs;
 }
 
