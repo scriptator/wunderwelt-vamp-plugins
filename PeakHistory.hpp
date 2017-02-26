@@ -21,7 +21,6 @@ public:
     void addPeak(const PeakFinder::Peak<T> *peak);
     void noPeak();
 
-    bool isAlive() const;
     void getInterpolatedPositionHistory(std::vector<double>& resultVector) const;
 
     const PeakFinder::Peak<T>* getFirst() const {
@@ -30,6 +29,19 @@ public:
 
     const PeakFinder::Peak<T>* getLast() const {
         return this->peaks.at(peaks.size() - 1);
+    }
+    
+    bool isAlive() {
+        alive = alive && recentlyMissed < broadestAllowedInterruption;
+        return alive;
+    }
+    
+    size_t size() {
+        return this->total;
+    }
+    
+    size_t numberOfMissed() {
+        return this->missed;
     }
 
 private:
@@ -41,6 +53,7 @@ private:
     size_t missed;
     size_t recentlyMissed;
     
+    bool alive;
 };
 
 #endif /* PeakHistory_hpp */

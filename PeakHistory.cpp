@@ -13,7 +13,8 @@ template<typename T> PeakHistory<T>::PeakHistory(size_t broadestAllowedInterrupt
     broadestAllowedInterruption(broadestAllowedInterruption),
     total(0),
     missed(0),
-    recentlyMissed(0) {
+    recentlyMissed(0),
+    alive(true) {
 }
 
 template<typename T> PeakHistory<T>::PeakHistory(PeakFinder::Peak<T> *initalPeak, size_t broadestAllowedInterruption):

@@ -20,9 +20,9 @@
 
 #define SPEED_OF_SOUND 343
 #define PEAK_DETECTION_TIME 1000 // ms
-#define UPPER_THRESHOLD_FREQUENCY 3000 // Hz
+#define UPPER_THRESHOLD_FREQUENCY 4000 // Hz
 #define MAX_BIN_JUMP 2 // bins
-#define BROADEST_ALLOWED_INTERRUPTION 5 // steps
+#define BROADEST_ALLOWED_INTERRUPTION 8 // steps
 
 using std::string;
 
