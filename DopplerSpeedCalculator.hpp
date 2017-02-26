@@ -19,6 +19,10 @@
 #include "PeakHistory.hpp"
 
 #define SPEED_OF_SOUND 343
+#define PEAK_DETECTION_TIME 1000 // ms
+#define UPPER_THRESHOLD_FREQUENCY 3000 // Hz
+#define MAX_BIN_JUMP 2 // bins
+#define BROADEST_ALLOWED_INTERRUPTION 5 // steps
 
 using std::string;
 
@@ -33,6 +37,7 @@ class DopplerSpeedCalculator : public Vamp::Plugin {
 
 public:
     DopplerSpeedCalculator(float inputSampleRate);
+    ~DopplerSpeedCalculator ();
 
     string getIdentifier() const;
     string getName() const;
@@ -93,7 +98,8 @@ private:
     CarState carState;
     _VampPlugin::Vamp::RealTime stableBegin;
     _VampPlugin::Vamp::RealTime stableEnd;
-
+    
+    void tracePeaks(const std::vector<PeakFinder::Peak<float> *> &peaks, bool allowNew);
     // store the history of all found peaks
     std::vector<std::vector<PeakFinder::Peak<float>*>> peakMatrix;
     std::vector<PeakHistory<float>> peakHistories;

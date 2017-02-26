@@ -15,31 +15,32 @@
 template<typename T> class PeakHistory {
     
 public:
-    PeakHistory();
+    PeakHistory(size_t broadestAllowedInterruption);
+    PeakHistory(PeakFinder::Peak<T> *initalPeak, size_t broadestAllowedInterruption);
 
     void addPeak(const PeakFinder::Peak<T> *peak);
-    
-    void noPeak() {
-        this->peaks.push_back(nullptr);
-    }
+    void noPeak();
 
-    bool isAlive() const {
-        return this->alive;
-    }
-
+    bool isAlive() const;
     void getInterpolatedPositionHistory(std::vector<double>& resultVector) const;
 
-    PeakFinder::Peak<T>* getFirst() const {
+    const PeakFinder::Peak<T>* getFirst() const {
         return this->peaks.at(0);
     }
 
-    PeakFinder::Peak<T>* getLast() const {
+    const PeakFinder::Peak<T>* getLast() const {
         return this->peaks.at(peaks.size() - 1);
     }
 
 private:
-    std::vector<PeakFinder::Peak<T> *> peaks;
-    bool alive;
+    std::vector<const PeakFinder::Peak<T> *> peaks;
+
+    size_t broadestAllowedInterruption;
+    
+    size_t total;
+    size_t missed;
+    size_t recentlyMissed;
+    
 };
 
 #endif /* PeakHistory_hpp */
