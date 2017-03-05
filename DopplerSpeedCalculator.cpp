@@ -23,22 +23,23 @@ using Vamp::RealTime;
 
 #include <cmath>
 
+// the channel we're gona use (plugin works only mono)
 #define CHANNEL 0
 
 // Parameter Identifiers
 #define DEBUG_CSV_FILES "write-debug-csv"
 
-
+// constructor of the calculator
 DopplerSpeedCalculator::DopplerSpeedCalculator (float inputSampleRate) :
     Vamp::Plugin(inputSampleRate),
-    carState(CarState::UNKNOWN),
-    peakMatrix(std::vector<std::vector<PeakFinder::Peak<float>*>>()),
+    peakMatrix(vector<vector<Peak<float>*>>()),
     m_blocksProcessed(0),
     m_stepSize(0),
     m_blockSize(0),
+    fftData(vector<vector<float>>(
+)),
     m_outputNumbers({})
 {
-    // initialize parameters with default values
     ParameterList parameters = this->getParameterDescriptors();
     for (auto it=parameters.begin(); it < parameters.end(); ++it) {
         ParameterDescriptor& desc = *it;
@@ -83,7 +84,7 @@ DopplerSpeedCalculator::InputDomain DopplerSpeedCalculator::getInputDomain() con
 }
 
 size_t DopplerSpeedCalculator::getPreferredBlockSize() const {
-    return 4096;
+    return 8192;
 }
 
 size_t DopplerSpeedCalculator::getPreferredStepSize() const {
@@ -105,7 +106,7 @@ DopplerSpeedCalculator::ParameterList DopplerSpeedCalculator::getParameterDescri
     desc.identifier = DEBUG_CSV_FILES;
     desc.name = "Debug CSV Files";
     desc.description = "Set to 1 if you want Debug CSV Files to be written to your home directory";
-    desc.defaultValue = 0;
+    desc.defaultValue = 1;
     desc.quantizeStep = 1.0f;
     desc.isQuantized = true;
     desc.minValue = 0;
@@ -206,58 +207,59 @@ void DopplerSpeedCalculator::reset() {
 }
 
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *const *inputBuffers, RealTime timestamp) {
-    float curMag = 0;
     const float *const inputBuffer = inputBuffers[CHANNEL];
     vector<float> currentData = vector<float>();
+    bool peakDectectionTime = timestamp < RealTime().fromMilliseconds(PEAK_DETECTION_TIME);
 
     // 0 Hz term, equivalent to the average of all the samples in the window
     // complex<float> dcTerm = complex<float>(inputBuffer[0], inputBuffer[1]);
     
     for (size_t i = 2; i < m_blockSize + 2; i+=2) {
-        curMag = calcNormalizedMagnitude(std::complex<float>(inputBuffer[i], inputBuffer[i+1]));
-        curMag = 20 * log10(curMag);
-        csvfile << curMag << ";";
+        float curMag = std::abs(std::complex<float>(inputBuffer[i], inputBuffer[i+1]));
         currentData.push_back(curMag);
     }
-    csvfile << "\n";
-    
-    // find all peaks with relatively small threshold amplitude first
-    std::vector<PeakFinder::Peak<float>*> peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 8.0f, timestamp);
-    this->peakMatrix.push_back(peaks);
-    
-    
-    // throw away those which are above the frequency threshold
-    peaks.erase(std::remove_if(peaks.begin(), peaks.end(),
-                               [this](PeakFinder::Peak<float> *elem) -> bool {
-                                   return this->getFrequencyForBin(elem->interpolatedPosition) > UPPER_THRESHOLD_FREQUENCY;
-                               }),
-                peaks.end());
-    
-    // trace the peaks
-    this->tracePeaks(peaks, timestamp < RealTime().fromMilliseconds(PEAK_DETECTION_TIME));
-    
-//    // iterate and throw those lower than a threshold frequency into the "dominating-frequencies" feature
-//    Feature f;
-//    f.timestamp = timestamp;
-//    f.hasTimestamp = true;
-//    for (auto it=peaks.begin(); it < peaks.end(); ++it) {
-//        PeakFinder::Peak<float> *peak = *it;
-//        double position = peak->interpolatedPosition;
-//        float freq = getFrequencyForBin(position);
-//        if (freq < UPPER_THRESHOLD_FREQUENCY && peak->height >= 15.0f) {
-//            f.values.push_back(freq);
-//        }
-//    }
+
+    // TODO improve this,
+    fftData.push_back(currentData);
+
+    if (fftData.size() == MOVING_FFT_AVERAGE_WIDTH) {
+        vector<float> summedData = vector<float>(m_blockSize / 2);
+        for (auto fft : fftData) {
+            for (size_t i = 0; i < fft.size(); i++) {
+                summedData[i] += fft[i];
+            }
+        }
+        
+        vector<float> averagedData;
+        for (auto val : summedData) {
+            float avgMag = val / MOVING_FFT_AVERAGE_WIDTH;
+            float avgNormMag = normalizeMagnitude(avgMag);
+            csvfile << avgNormMag << ";";
+            averagedData.push_back(avgNormMag);
+        }
+        csvfile << "\n";
+        
+        // find all peaks with relatively small threshold amplitude first
+        auto beginIt = averagedData.begin();
+        auto endit = beginIt + getBinForFrequency(UPPER_THRESHOLD_FREQUENCY);
+        float heightThreshold = peakDectectionTime ? PEAK_DETECTION_HEIGHT_THRESHOLD : PEAK_TRACING_HEIGHT_THRESHOLD;
+        std::vector<Peak<float>*> peaks = PeakFinder::findPeaksThreshold(beginIt, endit, heightThreshold, timestamp);
+        this->peakMatrix.push_back(peaks);
+        
+        
+        // trace the peaks
+        this->tracePeaks(peaks, peakDectectionTime);
+        
+        // remove the oldest fft result from the fftData vector
+        fftData.erase(fftData.begin());
+    }
+
     FeatureSet fs;
-//    fs[m_outputNumbers["dominating-frequencies"]].push_back(f);
-    
-    this->stableBegin = timestamp;
-    this->stableEnd = timestamp;
     m_blocksProcessed++;
     return fs;
 }
 
-void DopplerSpeedCalculator::tracePeaks(const std::vector<PeakFinder::Peak<float> *> &peaks, bool allowNew) {
+void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks, bool allowNew) {
     auto currentHist = peakHistories.begin();
     auto lastHistory = currentHist;
 
@@ -286,8 +288,12 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<PeakFinder::Peak<float
             if (peak->interpolatedPosition < currentHistoryPosition) {
                 if (lastDiff <= MAX_BIN_JUMP || currentDiff <= MAX_BIN_JUMP) {  // the peak is near enough to one of the already existing peaks
                     if (lastDiff < currentDiff) {
-                        lastHistory->addPeak(peak);
-                        addedPeakToLast = true;
+                        if (peak->interpolatedPosition > lastHistoryPosition + 1) {
+                            std::cerr << "Warning: " << peak->timestamp.sec*1000 + peak->timestamp.msec() << ": " << peak->interpolatedPosition << " vs. " << lastHistoryPosition << "\n";
+                        } else {
+                            lastHistory->addPeak(peak);
+                            addedPeakToLast = true;
+                        }
                     } else {
                         currentHist->addPeak(peak);
                         addedPeakToCurrent = true;
@@ -325,26 +331,16 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<PeakFinder::Peak<float
               [](const PeakHistory<float> & a, const PeakHistory<float> & b) -> bool {
         return a.getLast()->interpolatedPosition < b.getLast()->interpolatedPosition;
     });
-    
 }
 
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures() {
     // put the feature into the feature set
     FeatureSet fs;
 
-    // calculate the speeds from the peakHistories by taking the first and the last frequency
-//    vector<float>& speedCalculations = speed.values;
-//    for (auto it = this->peakHistories.begin(); it < this->peakHistories.end(); ++it) {
-//        float approachingFreq = getFrequencyForBin(it->getFirst()->interpolatedPosition);
-//        float leavingFreq = getFrequencyForBin(it->getLast()->interpolatedPosition);
-//        float speed = dopplerSpeedMovingSource(approachingFreq, leavingFreq);
-//        speedCalculations.push_back(speed);
-//    }
-
-    // sort peaks by average height
+    // sort peaks by total height
     std::sort(peakHistories.begin(), peakHistories.end(),
               [](const PeakHistory<float> & a, const PeakHistory<float> & b) -> bool {
-                  return a.size() > b.size();
+                  return a.getTotalPeakHeight() > b.getTotalPeakHeight();
               });
 
     // output the dominating frequencies feature
@@ -357,17 +353,23 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures(
     for (auto pos : positions) {
         dominatingFrequencies.duration = RealTime().fromSeconds(m_blockSize / m_inputSampleRate * (1.0 * m_stepSize / m_blockSize));
         dominatingFrequencies.timestamp = pos.first;
-        dominatingFrequencies.values = vector<float>(1, pos.second);
+        dominatingFrequencies.values = vector<float>(1, getFrequencyForBin(pos.second));
         fs[m_outputNumbers["dominating-frequencies"]].push_back(dominatingFrequencies);
     }
     
     Feature speed;
-    auto approaching = firstHist->getStableBegin();
-    auto leaving = firstHist->getStableEnd();
-    speed.timestamp = approaching->timestamp;
-    speed.duration = approaching->timestamp - speed.timestamp;
-    speed.values.push_back(dopplerSpeedMovingSource(approaching->interpolatedPosition, leaving->interpolatedPosition));
-    
+    while (firstHist != peakHistories.end()) {
+        auto approaching = firstHist->getStableBegin();
+        auto leaving = firstHist->getStableEnd();
+        if (approaching && leaving) {
+            speed.timestamp = approaching->timestamp;
+            speed.duration = approaching->timestamp - speed.timestamp;
+            speed.values.push_back(dopplerSpeedMovingSource(approaching->interpolatedPosition, leaving->interpolatedPosition));
+        }
+
+        ++firstHist;
+    }
+
     fs[m_outputNumbers["naive-speed-of-source"]].push_back(speed);
 
     return fs;

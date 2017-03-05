@@ -19,12 +19,18 @@
 #include "PeakHistory.hpp"
 
 #define SPEED_OF_SOUND 343
-#define PEAK_DETECTION_TIME 1000 // ms
-#define UPPER_THRESHOLD_FREQUENCY 4000 // Hz
-#define MAX_BIN_JUMP 2 // bins
+
+#define PEAK_DETECTION_TIME 1500 // ms
+#define PEAK_DETECTION_HEIGHT_THRESHOLD 15.0 // dB
+#define PEAK_TRACING_HEIGHT_THRESHOLD 5.0 // dB
+#define UPPER_THRESHOLD_FREQUENCY 1500 // Hz
+#define MAX_BIN_JUMP 5 // bins
 #define BROADEST_ALLOWED_INTERRUPTION 10 // steps
 
+#define MOVING_FFT_AVERAGE_WIDTH 4
+
 using std::string;
+using PeakFinder::Peak;
 
 /// Calculates the speed of a moving source relative to a still measuring point given a before-frequency and an after-frequency.
 /// The frequencies may be in any unit, the speed is returned in km/h
@@ -75,18 +81,24 @@ public:
         return (1.0f * this->m_inputSampleRate * bin) / this->m_blockSize;
     };
     
-    /// Calculates the normalized magnitude given a complex number
+    /// calculates bin number of a given frequency
+    template<typename T> size_t getBinForFrequency(T frequency) {
+        return (1.0 * frequency * m_blockSize) / this->m_inputSampleRate;
+    };
+    
+    /// Calculates the normalized magnitude in dB given a complex number
     /// formula reference https://groups.google.com/d/msg/comp.dsp/cZsS1ftN5oI/rEjHXKTxgv8J
     template<typename T> float calcNormalizedMagnitude(std::complex<T> complexVal) {
-        return std::abs(complexVal) * 2 / (this->m_blockSize);
+        return normalizeMagnitude(std::abs(complexVal));
+    };
+    
+    /// Calculates the normalized magnitude in dB given the magnitude as a number
+    /// formula reference https://groups.google.com/d/msg/comp.dsp/cZsS1ftN5oI/rEjHXKTxgv8J
+    template<typename T> float normalizeMagnitude(T magnitude) {
+        auto mag = magnitude * 2 / (this->m_blockSize);
+        return 20 * log10(mag);
     };
 
-    enum CarState {
-        UNKNOWN,
-        APPROACHING_STABLE,
-        UNSTABLE,
-        LEAVING_STABLE
-    };
 
 private:
     size_t m_blocksProcessed;
@@ -94,14 +106,14 @@ private:
     size_t m_blockSize;
     mutable std::map<std::string, int> m_outputNumbers;
     std::map<std::string, float> m_parameterValues;
-
-    CarState carState;
-    _VampPlugin::Vamp::RealTime stableBegin;
-    _VampPlugin::Vamp::RealTime stableEnd;
     
-    void tracePeaks(const std::vector<PeakFinder::Peak<float> *> &peaks, bool allowNew);
+    vector<vector<float>> fftData;
+    
+    // function which traces peaks over time
+    void tracePeaks(const std::vector<Peak<float> *> &peaks, bool allowNew);
+    
     // store the history of all found peaks
-    std::vector<std::vector<PeakFinder::Peak<float>*>> peakMatrix;
+    std::vector<std::vector<Peak<float>*>> peakMatrix;
     std::vector<PeakHistory<float>> peakHistories;
 
     /// csv files for debug purposes which get (over)written on every execution

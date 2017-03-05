@@ -13,7 +13,7 @@
 #include "PeakFinder.hpp"
 #include <vamp-sdk/Plugin.h>
 
-# define STABLE_LENGTH_MINIMUM 5
+# define STABLE_LENGTH_MINIMUM 3
 
 using PeakFinder::Peak;
 
@@ -31,6 +31,10 @@ public:
     double getAveragePeakHeight() const {
         return this->sumOfHeights / total;
     }
+    
+    double getTotalPeakHeight() const {
+        return this->sumOfHeights;
+    }
 
     const Peak<T>* getFirst() const {
         return this->peaks.at(0);
@@ -46,6 +50,14 @@ public:
     
     bool isAlive() {
         alive = alive && recentlyMissed < broadestAllowedInterruption;
+        if (!alive) {
+            auto begin = this->getStableBegin();
+            auto end = this->getStableEnd();
+            alive = alive || (begin && end && begin->timestamp.sec < 2 && end->timestamp.sec >= 4 && begin->interpolatedPosition > end->interpolatedPosition);
+        }
+        if (!alive) {
+            std::cerr << getLast()->interpolatedPosition << " (time " << getLast()->timestamp.sec*1000 + getLast()->timestamp.msec() << ", height " << getAveragePeakHeight() << ") is not alive any more :( \n";
+        }
         return alive;
     }
     

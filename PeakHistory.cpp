@@ -7,10 +7,12 @@
 //
 
 #include "PeakHistory.hpp"
+#include <math.h>
 
 template<typename T> PeakHistory<T>::PeakHistory(size_t broadestAllowedInterruption):
     peaks(std::vector<const Peak<T>*>()),
     broadestAllowedInterruption(broadestAllowedInterruption),
+    sumOfHeights(0),
     total(0),
     missed(0),
     recentlyMissed(0),
@@ -19,7 +21,7 @@ template<typename T> PeakHistory<T>::PeakHistory(size_t broadestAllowedInterrupt
 
 template<typename T> PeakHistory<T>::PeakHistory(Peak<T> *initalPeak, size_t broadestAllowedInterruption):
     PeakHistory<T>::PeakHistory(broadestAllowedInterruption) {
-        this->peaks = std::vector<const Peak<T>*>{initalPeak};
+        this->addPeak(initalPeak);
 }
 
 template<typename T> void PeakHistory<T>::addPeak(const Peak<T> *peak) {
@@ -47,13 +49,13 @@ template<typename T> const Peak<T>* PeakHistory<T>::getStableBegin() {
             stableValue = peak->interpolatedPosition;
         }
         
-        if (stableLength > STABLE_LENGTH_MINIMUM) {
+        if (stableLength >= STABLE_LENGTH_MINIMUM) {
             return peak;
         }
     }
     
-    // no stable streak found --> return first
-    return getFirst();
+    // no stable streak found --> return NULL
+    return nullptr;
 }
 
 template<typename T> const Peak<T>* PeakHistory<T>::getStableEnd() {
@@ -62,7 +64,7 @@ template<typename T> const Peak<T>* PeakHistory<T>::getStableEnd() {
     
     for (auto it = peaks.rbegin(); it < peaks.rend(); ++it) {
         auto peak = *it;
-        if (stableValue == peak->interpolatedPosition) {
+        if (fabs(stableValue - peak->interpolatedPosition) <= 1) {
             stableLength++;
         } else {
             stableLength = 0;
@@ -74,8 +76,8 @@ template<typename T> const Peak<T>* PeakHistory<T>::getStableEnd() {
         }
     }
     
-    // no stable streak found --> return first
-    return getLast();
+    // no stable streak found --> return NULL
+    return nullptr;
 }
 
 template<typename T> void PeakHistory<T>::getInterpolatedPositionHistory(std::vector<std::pair<Vamp::RealTime, double>>& resultVector) const {
