@@ -1,9 +1,9 @@
 
 PLUGIN_LIBRARY_NAME := wunderwelt-vamp-plugin
 
-PLUGIN_SOURCES 	    := wunderwelt-vamp-plugin.cpp plugins.cpp
+PLUGIN_SOURCES 	    := AmplitudeFollower.cpp DopplerSpeedCalculator.cpp PeakFinder.cpp PeakHistory.cpp vamp-test-plugin.cpp
 
-PLUGIN_HEADERS 	    := wunderwelt-vamp-plugin.hpp
+PLUGIN_HEADERS 	    := AmplitudeFollower.hpp DopplerSpeedCalculator.hpp PeakFinder.hpp PeakHistory.hpp vamp-test-plugin.hpp
 
 SRC_DIR		:= .
 
@@ -41,5 +41,8 @@ depend:
 
 # DO NOT DELETE
 
-VampTestPlugin.o: wunderwelt-vamp-plugin.hpp
-plugins.o: wunderwelt-vamp-plugin.hpp
+AmplitudeFollower.o: AmplitudeFollower.hpp
+DopplerSpeedCalculator.o: DopplerSpeedCalculator.hpp
+PeakFinder.o: PeakFinder.hpp
+PeakHistory.o: PeakHistory.hpp
+VampTestPlugin.o: vamp-test-plugin.hpp
