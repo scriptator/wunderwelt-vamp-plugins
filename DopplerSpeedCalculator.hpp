@@ -22,7 +22,7 @@
 #define PEAK_DETECTION_TIME 1000 // ms
 #define UPPER_THRESHOLD_FREQUENCY 4000 // Hz
 #define MAX_BIN_JUMP 2 // bins
-#define BROADEST_ALLOWED_INTERRUPTION 8 // steps
+#define BROADEST_ALLOWED_INTERRUPTION 10 // steps
 
 using std::string;
 

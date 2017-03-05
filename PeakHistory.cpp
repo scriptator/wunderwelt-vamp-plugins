@@ -9,7 +9,7 @@
 #include "PeakHistory.hpp"
 
 template<typename T> PeakHistory<T>::PeakHistory(size_t broadestAllowedInterruption):
-    peaks(std::vector<const PeakFinder::Peak<T>*>()),
+    peaks(std::vector<const Peak<T>*>()),
     broadestAllowedInterruption(broadestAllowedInterruption),
     total(0),
     missed(0),
@@ -17,14 +17,15 @@ template<typename T> PeakHistory<T>::PeakHistory(size_t broadestAllowedInterrupt
     alive(true) {
 }
 
-template<typename T> PeakHistory<T>::PeakHistory(PeakFinder::Peak<T> *initalPeak, size_t broadestAllowedInterruption):
+template<typename T> PeakHistory<T>::PeakHistory(Peak<T> *initalPeak, size_t broadestAllowedInterruption):
     PeakHistory<T>::PeakHistory(broadestAllowedInterruption) {
-        this->peaks = std::vector<const PeakFinder::Peak<T>*>{initalPeak};
+        this->peaks = std::vector<const Peak<T>*>{initalPeak};
 }
 
-template<typename T> void PeakHistory<T>::addPeak(const PeakFinder::Peak<T> *peak) {
+template<typename T> void PeakHistory<T>::addPeak(const Peak<T> *peak) {
     this->peaks.push_back(peak);
     recentlyMissed = 0;
+    sumOfHeights += peak->height;
     this->total++;
 }
 
@@ -34,9 +35,52 @@ template<typename T> void PeakHistory<T>::noPeak() {
     this->total++;
 }
 
-template<typename T> void PeakHistory<T>::getInterpolatedPositionHistory(std::vector<double>& resultVector) const {
+template<typename T> const Peak<T>* PeakHistory<T>::getStableBegin() {
+    size_t stableLength = 0;
+    double stableValue = 0.0;
+    
+    for (const Peak<T>* peak : this->peaks) {
+        if (stableValue == peak->interpolatedPosition) {
+            stableLength++;
+        } else {
+            stableLength = 0;
+            stableValue = peak->interpolatedPosition;
+        }
+        
+        if (stableLength > STABLE_LENGTH_MINIMUM) {
+            return peak;
+        }
+    }
+    
+    // no stable streak found --> return first
+    return getFirst();
+}
+
+template<typename T> const Peak<T>* PeakHistory<T>::getStableEnd() {
+    size_t stableLength = 0;
+    double stableValue = 0.0;
+    
+    for (auto it = peaks.rbegin(); it < peaks.rend(); ++it) {
+        auto peak = *it;
+        if (stableValue == peak->interpolatedPosition) {
+            stableLength++;
+        } else {
+            stableLength = 0;
+            stableValue = peak->interpolatedPosition;
+        }
+        
+        if (stableLength > STABLE_LENGTH_MINIMUM) {
+            return peak;
+        }
+    }
+    
+    // no stable streak found --> return first
+    return getLast();
+}
+
+template<typename T> void PeakHistory<T>::getInterpolatedPositionHistory(std::vector<std::pair<Vamp::RealTime, double>>& resultVector) const {
     for (auto peak : this->peaks) {
-        resultVector.push_back(peak->interpolatedPosition);
+        resultVector.push_back(std::pair<Vamp::RealTime, double>(peak->timestamp, peak->interpolatedPosition));
     }
 }
 

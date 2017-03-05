@@ -12,28 +12,34 @@
 #include <stdio.h>
 #include <vector>
 #include <algorithm>
+#include <vamp-sdk/Plugin.h>
+
+using Vamp::RealTime;
 
 namespace PeakFinder {
 
     template<class T> struct Peak {
         T value;
+        RealTime timestamp;
         T height;
         size_t position;
         double interpolatedPosition;
 
-        Peak<T>(): value(-1), height(-1), position(-1), interpolatedPosition(-1) {}
+        Peak<T>(): value(-1), height(-1), position(-1), interpolatedPosition(-1), timestamp(RealTime::zeroTime) {}
 
-        Peak<T>(T value, T height, size_t position, double interpolatedPosition):
-            value(value), height(height), position(position), interpolatedPosition(interpolatedPosition) {}
+        Peak<T>(T value, T height, size_t position, double interpolatedPosition, _VampPlugin::Vamp::RealTime timestamp):
+            value(value), height(height), position(position), interpolatedPosition(interpolatedPosition), timestamp(timestamp) {}
         
         Peak<T>(const Peak<T> & other):
-            value(other.value), height(other.height), position(other.position), interpolatedPosition(other.interpolatedPosition)
+            value(other.value), height(other.height), position(other.position), interpolatedPosition(other.interpolatedPosition),
+            timestamp(other.timestamp)
         { }
     };
 
     // find peaks by returning those elements where the surrounding is at least one threshold lower
+    // the provided timestamp is set on the peak for later reference
     template <class Iterator, class T = typename std::iterator_traits<Iterator>::value_type>
-    std::vector<Peak<T>*> findPeaksThreshold(Iterator begin, Iterator end, T threshold);
+    std::vector<Peak<T>*> findPeaksThreshold(Iterator begin, Iterator end, T threshold, RealTime timestamp);
 
     enum SignalDirection {
         ascending,
@@ -48,7 +54,7 @@ using std::vector;
 using std::pair;
 
 template <class Iterator, class T>
-std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin, Iterator end, T threshold) {
+std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin, Iterator end, T threshold, RealTime timestamp) {
     vector<PeakFinder::Peak<T>*> outputBuffer;
 
     SignalDirection direction = stagnating;
@@ -70,7 +76,7 @@ std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin,
                 direction = SignalDirection::descending;
                 height = previous - lastValley.second;
                 if (height >= threshold) {
-                    candidate = PeakFinder::Peak<float>(previous, height, index - 1, index - 1);
+                    candidate = PeakFinder::Peak<float>(previous, height, index - 1, index - 1, timestamp);
                     validCandidate = true;
                 }
             }

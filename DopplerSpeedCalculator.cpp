@@ -83,11 +83,11 @@ DopplerSpeedCalculator::InputDomain DopplerSpeedCalculator::getInputDomain() con
 }
 
 size_t DopplerSpeedCalculator::getPreferredBlockSize() const {
-    return 2048;
+    return 4096;
 }
 
 size_t DopplerSpeedCalculator::getPreferredStepSize() const {
-    return 1024;
+    return 2048;
 }
 
 size_t DopplerSpeedCalculator::getMinChannelCount() const {
@@ -152,7 +152,7 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
     d.minValue = 0;
     d.maxValue = this->m_inputSampleRate / 2; // Nyquist Frequency
     d.isQuantized = false;
-    d.sampleType = OutputDescriptor::FixedSampleRate;
+    d.sampleType = OutputDescriptor::VariableSampleRate;
     d.hasDuration = true;
     m_outputNumbers[d.identifier] = n++;
     list.push_back(d);
@@ -222,7 +222,7 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     csvfile << "\n";
     
     // find all peaks with relatively small threshold amplitude first
-    std::vector<PeakFinder::Peak<float>*> peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 8.0f);
+    std::vector<PeakFinder::Peak<float>*> peaks = PeakFinder::findPeaksThreshold(currentData.begin(), currentData.end(), 8.0f, timestamp);
     this->peakMatrix.push_back(peaks);
     
     
@@ -331,30 +331,42 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<PeakFinder::Peak<float
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures() {
     // put the feature into the feature set
     FeatureSet fs;
-    Feature speed;
-    speed.timestamp = this->stableBegin;
-    speed.duration = this->stableEnd - this->stableBegin;
 
     // calculate the speeds from the peakHistories by taking the first and the last frequency
-    vector<float>& speedCalculations = speed.values;
-    for (auto it = this->peakHistories.begin(); it < this->peakHistories.end(); ++it) {
-        float approachingFreq = getFrequencyForBin(it->getFirst()->interpolatedPosition);
-        float leavingFreq = getFrequencyForBin(it->getLast()->interpolatedPosition);
-        float speed = dopplerSpeedMovingSource(approachingFreq, leavingFreq);
-        speedCalculations.push_back(speed);
-    }
+//    vector<float>& speedCalculations = speed.values;
+//    for (auto it = this->peakHistories.begin(); it < this->peakHistories.end(); ++it) {
+//        float approachingFreq = getFrequencyForBin(it->getFirst()->interpolatedPosition);
+//        float leavingFreq = getFrequencyForBin(it->getLast()->interpolatedPosition);
+//        float speed = dopplerSpeedMovingSource(approachingFreq, leavingFreq);
+//        speedCalculations.push_back(speed);
+//    }
+
+    // sort peaks by average height
+    std::sort(peakHistories.begin(), peakHistories.end(),
+              [](const PeakHistory<float> & a, const PeakHistory<float> & b) -> bool {
+                  return a.size() > b.size();
+              });
 
     // output the dominating frequencies feature
     Feature dominatingFrequencies;
+    dominatingFrequencies.hasTimestamp = true;
+    dominatingFrequencies.hasDuration = true;
     auto firstHist = this->peakHistories.begin();
-    vector<double> positions;
+    vector<pair<RealTime, double>> positions;
     firstHist->getInterpolatedPositionHistory(positions);
     for (auto pos : positions) {
-        // TODO timestamp
-        // dominatingFrequencies.timestamp =
-        dominatingFrequencies.values = vector<float>(1, pos);
+        dominatingFrequencies.duration = RealTime().fromSeconds(m_blockSize / m_inputSampleRate * (1.0 * m_stepSize / m_blockSize));
+        dominatingFrequencies.timestamp = pos.first;
+        dominatingFrequencies.values = vector<float>(1, pos.second);
         fs[m_outputNumbers["dominating-frequencies"]].push_back(dominatingFrequencies);
     }
+    
+    Feature speed;
+    auto approaching = firstHist->getStableBegin();
+    auto leaving = firstHist->getStableEnd();
+    speed.timestamp = approaching->timestamp;
+    speed.duration = approaching->timestamp - speed.timestamp;
+    speed.values.push_back(dopplerSpeedMovingSource(approaching->interpolatedPosition, leaving->interpolatedPosition));
     
     fs[m_outputNumbers["naive-speed-of-source"]].push_back(speed);
 
