@@ -39,13 +39,8 @@ namespace PeakFinder {
     // find peaks by returning those elements where the surrounding is at least one threshold lower
     // the provided timestamp is set on the peak for later reference
     template <class Iterator, class T = typename std::iterator_traits<Iterator>::value_type>
-    std::vector<Peak<T>*> findPeaksThreshold(Iterator begin, Iterator end, T heightThreshold, RealTime timestamp);
+    std::vector<Peak<T>*> findPeaksThreshold(Iterator begin, Iterator end, T threshold, RealTime timestamp);
 
-    
-    template<typename T> bool grtr(T a, T b) {
-        return a - b > 1;
-    }
-    
     enum SignalDirection {
         ascending,
         descending,
@@ -59,7 +54,7 @@ using std::vector;
 using std::pair;
 
 template <class Iterator, class T>
-std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin, Iterator end, T heightThreshold, RealTime timestamp) {
+std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin, Iterator end, T threshold, RealTime timestamp) {
     vector<PeakFinder::Peak<T>*> outputBuffer;
 
     SignalDirection direction = stagnating;
@@ -76,16 +71,16 @@ std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin,
     for (auto it = begin; it < end; ++it) {
         current = *it;
 
-        if (grtr(previous, current)) {
+        if (current < previous) {
             if (direction != SignalDirection::descending) {
                 direction = SignalDirection::descending;
                 height = previous - lastValley.second;
-                if (height >= heightThreshold) {
+                if (height >= threshold) {
                     candidate = PeakFinder::Peak<float>(previous, height, index - 1, index - 1, timestamp);
                     validCandidate = true;
                 }
             }
-        } else if (grtr(current, previous)) {
+        } else if (current > previous) {
             if (direction != SignalDirection::ascending) {
                 direction = SignalDirection::ascending;
                 lastValley.first = index - 1;
@@ -93,7 +88,7 @@ std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin,
 
                 if (validCandidate) {
                     height = candidate.value - previous;
-                    if (height >= heightThreshold) {
+                    if (height >= threshold) {
                         candidate.height = std::min(candidate.height, height);
                         outputBuffer.push_back(new PeakFinder::Peak<float>(candidate));
                     }
