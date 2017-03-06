@@ -14,6 +14,7 @@
 #include <complex>      // std::complex
 #include <assert.h>
 #include <math.h>
+#include <cmath>
 
 using std::string;
 using std::vector;
@@ -21,13 +22,8 @@ using std::complex;
 using std::stringstream;
 using Vamp::RealTime;
 
-#include <cmath>
-
 // the channel we're gona use (plugin works only mono)
 #define CHANNEL 0
-
-// Parameter Identifiers
-#define DEBUG_CSV_FILES "write-debug-csv"
 
 // constructor of the calculator
 DopplerSpeedCalculator::DopplerSpeedCalculator (float inputSampleRate) :
@@ -101,19 +97,95 @@ size_t DopplerSpeedCalculator::getMaxChannelCount() const {
 
 DopplerSpeedCalculator::ParameterList DopplerSpeedCalculator::getParameterDescriptors() const {
     ParameterList plist = ParameterList();
-    
+
     ParameterDescriptor desc = ParameterDescriptor();
     desc.identifier = DEBUG_CSV_FILES;
     desc.name = "Debug CSV Files";
-    desc.description = "Set to 1 if you want Debug CSV Files to be written to your home directory";
-    desc.defaultValue = 1;
+    desc.description = "Set to 1 if you want Debug CSV Files to be written to the current working directory";
+    desc.defaultValue = 0;
     desc.quantizeStep = 1.0f;
     desc.isQuantized = true;
     desc.minValue = 0;
     desc.maxValue = 1;
     desc.valueNames = std::vector<std::string>{"off", "on"};
-    plist.push_back(std::move(desc));
-    
+    plist.push_back(desc);
+
+    desc = ParameterDescriptor();
+    desc.identifier = PEAK_DETECTION_TIME_ID;
+    desc.name = "Peak Detection Time";
+    desc.description = "Number of seconds from start during which new peaks are accepted";
+    desc.defaultValue = PEAK_DETECTION_TIME;
+    desc.minValue = 0;
+    desc.maxValue = 10;
+    desc.unit = "s";
+    plist.push_back(desc);
+
+    desc = ParameterDescriptor();
+    desc.identifier = PEAK_DETECTION_HEIGHT_THRESHOLD_ID;
+    desc.name = "Peak Detection Height Threshold";
+    desc.description = "The height (in dB) a peak must have during peak detection time to be accepted";
+    desc.defaultValue = PEAK_DETECTION_HEIGHT_THRESHOLD;
+    desc.minValue = 0;
+    desc.maxValue = 50;
+    desc.unit = "dB";
+    plist.push_back(desc);
+
+    desc = ParameterDescriptor();
+    desc.identifier = PEAK_TRACING_HEIGHT_THRESHOLD_ID;
+    desc.name = "Peak Tracing Height Threshold";
+    desc.description = "The height (in dB) a peak must have during peak tracing time to be accepted (i.e. after no new peaks are allowed any more)";
+    desc.defaultValue = PEAK_TRACING_HEIGHT_THRESHOLD;
+    desc.minValue = 0;
+    desc.maxValue = 50;
+    desc.unit = "dB";
+    plist.push_back(desc);
+
+    desc = ParameterDescriptor();
+    desc.identifier = UPPER_THRESHOLD_FREQUENCY_ID;
+    desc.name = "Upper Threshold Frequency";
+    desc.description = "Only peaks below this threshold frequency will be allowed)";
+    desc.defaultValue = UPPER_THRESHOLD_FREQUENCY;
+    desc.minValue = 0;
+    desc.maxValue = 20000;
+    desc.unit = "Hz";
+    plist.push_back(desc);
+
+    desc = ParameterDescriptor();
+    desc.identifier = MAX_BIN_JUMP_ID;
+    desc.name = "Maximum Bin Jump";
+    desc.description = "The largest allowed offset between the positions of two peak candidates for them to be considered the same.";
+    desc.defaultValue = MAX_BIN_JUMP;
+    desc.minValue = 1;
+    desc.maxValue = 20;
+    desc.isQuantized = true;
+    desc.quantizeStep = 1.0;
+    desc.unit = "bins";
+    plist.push_back(desc);
+
+    desc = ParameterDescriptor();
+    desc.identifier = BROADEST_ALLOWED_INTERRUPTION_ID;
+    desc.name = "Broadest allowed interruption";
+    desc.description = "The largest allowed temporal gap between two detected peaks in bins";
+    desc.defaultValue = BROADEST_ALLOWED_INTERRUPTION;
+    desc.minValue = 0;
+    desc.maxValue = 20;
+    desc.isQuantized = true;
+    desc.quantizeStep = 1.0;
+    desc.unit = "bins";
+    plist.push_back(desc);
+
+    desc = ParameterDescriptor();
+    desc.identifier = MOVING_FFT_AVERAGE_WIDTH_ID;
+    desc.name = "Width of moving average";
+    desc.description = "The number of steps whose data is averaged to detect the peaks afterwards";
+    desc.defaultValue = MOVING_FFT_AVERAGE_WIDTH;
+    desc.minValue = 1;
+    desc.maxValue = 10;
+    desc.isQuantized = true;
+    desc.quantizeStep = 1.0;
+    desc.unit = "steps";
+    plist.push_back(desc);
+
     return plist;
 }
 
@@ -160,9 +232,9 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
     
     d.identifier = "naive-speed-of-source";
     d.name = "Speed of noise-emitting source";
-    d.description = "Returns the speed of the noise-emitting source in m/s by calculating it directly from the frequency difference "
+    d.description = "Returns the speed of the noise-emitting source in km/h by calculating it directly from the frequency difference "
     "between the beginning and end of the event. This means it is negligent of the normal distance between measuring point and "
-    "route of the source. Returns exactly one value per detected event.";
+    "route of the source. Returns one feature with the duration of the detected feature, as given by 'dominating-frequency'";
     d.unit = "km/h";
     d.hasFixedBinCount = true;
     d.binCount = 1;
@@ -209,20 +281,21 @@ void DopplerSpeedCalculator::reset() {
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *const *inputBuffers, RealTime timestamp) {
     const float *const inputBuffer = inputBuffers[CHANNEL];
     vector<float> currentData = vector<float>();
-    bool peakDectectionTime = timestamp < RealTime().fromMilliseconds(PEAK_DETECTION_TIME);
-
+    bool peakDectectionTime = timestamp < RealTime().fromSeconds(getParameter(PEAK_DETECTION_TIME_ID));
+    int movingFFTAverageWidth = getParameter(MOVING_FFT_AVERAGE_WIDTH_ID);
+    
     // 0 Hz term, equivalent to the average of all the samples in the window
     // complex<float> dcTerm = complex<float>(inputBuffer[0], inputBuffer[1]);
     
+    // calculate the magnitudes and store them in fftData
     for (size_t i = 2; i < m_blockSize + 2; i+=2) {
         float curMag = std::abs(std::complex<float>(inputBuffer[i], inputBuffer[i+1]));
         currentData.push_back(curMag);
     }
+    fftData.emplace_back(std::move(currentData));
 
-    // TODO improve this,
-    fftData.push_back(currentData);
-
-    if (fftData.size() == MOVING_FFT_AVERAGE_WIDTH) {
+    if (fftData.size() == movingFFTAverageWidth) {
+        // sum up fftData to later calculate the average
         vector<float> summedData = vector<float>(m_blockSize / 2);
         for (auto fft : fftData) {
             for (size_t i = 0; i < fft.size(); i++) {
@@ -230,27 +303,27 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
             }
         }
         
+        // calc the average, normalize the magnitudes and store them again for peak finding
         vector<float> averagedData;
         for (auto val : summedData) {
-            float avgMag = val / MOVING_FFT_AVERAGE_WIDTH;
+            float avgMag = val / movingFFTAverageWidth;
             float avgNormMag = normalizeMagnitude(avgMag);
             csvfile << avgNormMag << ";";
             averagedData.push_back(avgNormMag);
         }
         csvfile << "\n";
         
-        // find all peaks with relatively small threshold amplitude first
+        // find all peaks, where the threshold is dependent on whether we are before or after PEAK_DETECTION_TIME
         auto beginIt = averagedData.begin();
-        auto endit = beginIt + getBinForFrequency(UPPER_THRESHOLD_FREQUENCY);
-        float heightThreshold = peakDectectionTime ? PEAK_DETECTION_HEIGHT_THRESHOLD : PEAK_TRACING_HEIGHT_THRESHOLD;
+        auto endit = beginIt + getBinForFrequency(getParameter(UPPER_THRESHOLD_FREQUENCY_ID));
+        float heightThreshold = peakDectectionTime ? getParameter(PEAK_DETECTION_HEIGHT_THRESHOLD_ID) : getParameter(PEAK_TRACING_HEIGHT_THRESHOLD_ID);
         std::vector<Peak<float>*> peaks = PeakFinder::findPeaksThreshold(beginIt, endit, heightThreshold, timestamp);
         this->peakMatrix.push_back(peaks);
-        
         
         // trace the peaks
         this->tracePeaks(peaks, peakDectectionTime);
         
-        // remove the oldest fft result from the fftData vector
+        // remove the oldest fft result from the fftData vector to achieve a moving average
         fftData.erase(fftData.begin());
     }
 
@@ -272,7 +345,11 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
     bool peakDone = false;
     bool addedPeakToLast = false;
     bool addedPeakToCurrent = false;
-
+    
+    // parameter values
+    auto maxBinJump = getParameter(MAX_BIN_JUMP_ID);
+    size_t broadestAllowedInterruption = (size_t) getParameter(BROADEST_ALLOWED_INTERRUPTION_ID);
+    
     std::vector<PeakHistory<float>> toInsert;
     
     // iterate through the peaks and PeakHistories at the same time
@@ -286,7 +363,7 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
             
             // if the peak is still between the two PeakHistories, try to associate it with one
             if (peak->interpolatedPosition < currentHistoryPosition) {
-                if (lastDiff <= MAX_BIN_JUMP || currentDiff <= MAX_BIN_JUMP) {  // the peak is near enough to one of the already existing peaks
+                if (lastDiff <= maxBinJump || currentDiff <= maxBinJump) {  // the peak is near enough to one of the already existing peaks
                     if (lastDiff < currentDiff) {
                         if (peak->interpolatedPosition > lastHistoryPosition + 1) {
                             std::cerr << "Warning: " << peak->timestamp.sec*1000 + peak->timestamp.msec() << ": " << peak->interpolatedPosition << " vs. " << lastHistoryPosition << "\n";
@@ -299,7 +376,7 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
                         addedPeakToCurrent = true;
                     }
                 } else if (allowNew) {          // the peak is not near enough, so insert it if allowNew is set
-                    toInsert.emplace_back(peak, BROADEST_ALLOWED_INTERRUPTION);
+                    toInsert.emplace_back(peak, broadestAllowedInterruption);
                 } // else ignore peak
                 peakDone = true;
             } else { // go one step further in the vector of PeakHistories
@@ -316,7 +393,7 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
         }
         
         if (!peakDone && allowNew) {
-            toInsert.emplace_back(peak, BROADEST_ALLOWED_INTERRUPTION);
+            toInsert.emplace_back(peak, broadestAllowedInterruption);
         }
     }
     
@@ -369,7 +446,6 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures(
             speed.values.push_back(dopplerSpeedMovingSource(approaching->interpolatedPosition, leaving->interpolatedPosition));
             break;
         }
-
         ++firstHist;
     }
 

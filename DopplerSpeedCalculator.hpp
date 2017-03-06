@@ -18,16 +18,27 @@
 #include "PeakFinder.hpp"
 #include "PeakHistory.hpp"
 
-#define SPEED_OF_SOUND 343
+// Parameter Identifiers
+#define DEBUG_CSV_FILES "write-debug-csv"
+#define PEAK_DETECTION_TIME_ID "peak-detection-time"
+#define PEAK_DETECTION_HEIGHT_THRESHOLD_ID "peak-detection-height-threshold"
+#define PEAK_TRACING_HEIGHT_THRESHOLD_ID "peak-tracing-height-threshold"
+#define UPPER_THRESHOLD_FREQUENCY_ID "upper-threshold-frequency"
+#define MAX_BIN_JUMP_ID "max-bin-jump"
+#define BROADEST_ALLOWED_INTERRUPTION_ID "broadest-interruption"
+#define MOVING_FFT_AVERAGE_WIDTH_ID "moving-fft-average-width"
 
-#define PEAK_DETECTION_TIME 1500 // ms
+// Parameter Default Values
+#define PEAK_DETECTION_TIME 1.5 // s
 #define PEAK_DETECTION_HEIGHT_THRESHOLD 15.0 // dB
 #define PEAK_TRACING_HEIGHT_THRESHOLD 5.0 // dB
 #define UPPER_THRESHOLD_FREQUENCY 1500 // Hz
 #define MAX_BIN_JUMP 5 // bins
 #define BROADEST_ALLOWED_INTERRUPTION 10 // steps
-
 #define MOVING_FFT_AVERAGE_WIDTH 4
+
+// Other constants
+#define SPEED_OF_SOUND 343
 
 using std::string;
 using PeakFinder::Peak;
