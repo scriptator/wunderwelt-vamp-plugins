@@ -163,7 +163,7 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
     d.description = "Returns the speed of the noise-emitting source in m/s by calculating it directly from the frequency difference "
     "between the beginning and end of the event. This means it is negligent of the normal distance between measuring point and "
     "route of the source. Returns exactly one value per detected event.";
-    d.unit = "m/s";
+    d.unit = "km/h";
     d.hasFixedBinCount = true;
     d.binCount = 1;
     d.hasKnownExtents = false;
@@ -362,9 +362,12 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures(
         auto approaching = firstHist->getStableBegin();
         auto leaving = firstHist->getStableEnd();
         if (approaching && leaving) {
+            speed.hasDuration = true;
+            speed.hasTimestamp = true;
             speed.timestamp = approaching->timestamp;
-            speed.duration = approaching->timestamp - speed.timestamp;
+            speed.duration = leaving->timestamp - approaching->timestamp;
             speed.values.push_back(dopplerSpeedMovingSource(approaching->interpolatedPosition, leaving->interpolatedPosition));
+            break;
         }
 
         ++firstHist;
