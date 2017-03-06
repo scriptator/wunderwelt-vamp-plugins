@@ -413,6 +413,10 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures() {
     // put the feature into the feature set
     FeatureSet fs;
+    
+    if (peakHistories.empty()) {
+        return fs;
+    }
 
     // sort peaks by total height
     std::sort(peakHistories.begin(), peakHistories.end(),
@@ -444,12 +448,11 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures(
             speed.timestamp = approaching->timestamp;
             speed.duration = leaving->timestamp - approaching->timestamp;
             speed.values.push_back(dopplerSpeedMovingSource(approaching->interpolatedPosition, leaving->interpolatedPosition));
+            fs[m_outputNumbers["naive-speed-of-source"]].push_back(speed);
             break;
         }
         ++firstHist;
     }
-
-    fs[m_outputNumbers["naive-speed-of-source"]].push_back(speed);
 
     return fs;
 }
