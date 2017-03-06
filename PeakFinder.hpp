@@ -36,7 +36,7 @@ namespace PeakFinder {
         { }
     };
 
-    // find peaks by returning those elements where the surrounding is at least one threshold lower
+    // find peaks by returning those elements where the next valleys on both sides are at least one threshold lower
     // the provided timestamp is set on the peak for later reference
     template <class Iterator, class T = typename std::iterator_traits<Iterator>::value_type>
     std::vector<Peak<T>*> findPeaksThreshold(Iterator begin, Iterator end, T threshold, RealTime timestamp);
@@ -72,22 +72,24 @@ std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin,
         current = *it;
 
         if (current < previous) {
-            if (direction != SignalDirection::descending) {
+            if (direction != SignalDirection::descending) {     // direction change downwards occurred
                 direction = SignalDirection::descending;
                 height = previous - lastValley.second;
+                // if the height is sufficient, make it a candidate
                 if (height >= threshold) {
                     candidate = PeakFinder::Peak<float>(previous, height, index - 1, index - 1, timestamp);
                     validCandidate = true;
                 }
             }
         } else if (current > previous) {
-            if (direction != SignalDirection::ascending) {
+            if (direction != SignalDirection::ascending) {      // direction change upwards occurred
                 direction = SignalDirection::ascending;
                 lastValley.first = index - 1;
                 lastValley.second = previous;
-
+                
                 if (validCandidate) {
                     height = candidate.value - previous;
+                    // if the height is sufficient, make the candidate a peak
                     if (height >= threshold) {
                         candidate.height = std::min(candidate.height, height);
                         outputBuffer.push_back(new PeakFinder::Peak<float>(candidate));

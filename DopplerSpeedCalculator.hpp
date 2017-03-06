@@ -118,6 +118,7 @@ private:
     mutable std::map<std::string, int> m_outputNumbers;
     std::map<std::string, float> m_parameterValues;
     
+    // contains the last few fft results which get averaged before finding peaks
     vector<vector<float>> fftData;
     
     // function which traces peaks over time
