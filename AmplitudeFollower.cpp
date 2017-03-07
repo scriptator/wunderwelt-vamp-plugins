@@ -103,9 +103,9 @@ AmplitudeFollower::OutputList AmplitudeFollower::getOutputDescriptors() const
 {
     OutputList list;
     int n = 0;
-    
+
     OutputDescriptor d;
-    
+
     d.identifier = "curve-fsr-amplitude";
     d.name = "Curve: Amplitude";
     d.description = "For each step a feature with the maximum value of the block is returned.";
@@ -118,18 +118,18 @@ AmplitudeFollower::OutputList AmplitudeFollower::getOutputDescriptors() const
     d.hasDuration = false;
     m_outputNumbers[d.identifier] = n++;
     list.push_back(d);
-    
+
     return list;
 }
 
 bool AmplitudeFollower::initialise(size_t channels, size_t stepSize, size_t blockSize) {
     if (channels < getMinChannelCount() ||
         channels > getMaxChannelCount()) return false;
-    
+
     m_channels = channels;
     m_stepSize = stepSize;
     m_blockSize = blockSize;
-    
+
     return true;
 }
 
@@ -143,19 +143,19 @@ AmplitudeFollower::FeatureSet AmplitudeFollower::process(const float *const *inp
     f.hasTimestamp = true;
     f.timestamp = timestamp;
     f.hasDuration = false;
-    
+
     float maxVal = 0;
-    
+
     for (int c = 0; c < m_channels; ++c) {
         // first value plus number of non-zero values
         for (int i = 0; i < m_blockSize; ++i) {
             maxVal = fmax(maxVal, fabsf(inputBuffers[c][i]));
         }
     }
-    
+
     // we have bin count --> only one value per feature
     f.values.push_back(maxVal);
-    
+
     // put the feature into the feature set
     FeatureSet fs;
     fs[m_outputNumbers["curve-fsr-amplitude"]].push_back(f);
@@ -165,6 +165,3 @@ AmplitudeFollower::FeatureSet AmplitudeFollower::process(const float *const *inp
 AmplitudeFollower::FeatureSet AmplitudeFollower::getRemainingFeatures() {
     return FeatureSet();
 }
-
-
-

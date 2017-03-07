@@ -28,13 +28,12 @@ using Vamp::RealTime;
 // constructor of the calculator
 DopplerSpeedCalculator::DopplerSpeedCalculator (float inputSampleRate) :
     Vamp::Plugin(inputSampleRate),
-    peakMatrix(vector<vector<Peak<float>*>>()),
     m_blocksProcessed(0),
     m_stepSize(0),
     m_blockSize(0),
-    fftData(vector<vector<float>>(
-)),
-    m_outputNumbers({})
+    m_outputNumbers({}),
+    fftData(vector<vector<float>>()),
+    peakMatrix(vector<vector<Peak<float>*>>())
 {
     ParameterList parameters = this->getParameterDescriptors();
     for (auto it=parameters.begin(); it < parameters.end(); ++it) {
@@ -214,9 +213,9 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
 {
     OutputList list;
     int n = 0;
-    
+
     OutputDescriptor d;
-    
+
     d.identifier = "dominating-frequencies";
     d.name = "Dominating Frequencies";
     d.description = "Returns the 5 most dominating frequencies per step";
@@ -229,7 +228,7 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
     d.hasDuration = true;
     m_outputNumbers[d.identifier] = n++;
     list.push_back(d);
-    
+
     d.identifier = "naive-speed-of-source";
     d.name = "Speed of noise-emitting source";
     d.description = "Returns the speed of the noise-emitting source in km/h by calculating it directly from the frequency difference "
@@ -251,10 +250,10 @@ DopplerSpeedCalculator::OutputList DopplerSpeedCalculator::getOutputDescriptors(
 bool DopplerSpeedCalculator::initialise(size_t channels, size_t stepSize, size_t blockSize) {
     if (channels < getMinChannelCount() ||
         channels > getMaxChannelCount()) return false;
-    
+
     m_stepSize = stepSize;
     m_blockSize = blockSize;
-    
+
     if (this->getParameter(DEBUG_CSV_FILES)) {
         // open the debug csv file for writing
         csvfile = std::ofstream("fft.csv");
@@ -283,10 +282,10 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
     vector<float> currentData = vector<float>();
     bool peakDectectionTime = timestamp < RealTime().fromSeconds(getParameter(PEAK_DETECTION_TIME_ID));
     int movingFFTAverageWidth = getParameter(MOVING_FFT_AVERAGE_WIDTH_ID);
-    
+
     // 0 Hz term, equivalent to the average of all the samples in the window
     // complex<float> dcTerm = complex<float>(inputBuffer[0], inputBuffer[1]);
-    
+
     // calculate the magnitudes and store them in fftData
     for (size_t i = 2; i < m_blockSize + 2; i+=2) {
         float curMag = std::abs(std::complex<float>(inputBuffer[i], inputBuffer[i+1]));
@@ -302,7 +301,7 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
                 summedData[i] += fft[i];
             }
         }
-        
+
         // calc the average, normalize the magnitudes and store them again for peak finding
         vector<float> averagedData;
         for (auto val : summedData) {
@@ -312,17 +311,17 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::process(const float *
             averagedData.push_back(avgNormMag);
         }
         csvfile << "\n";
-        
+
         // find all peaks, where the threshold is dependent on whether we are before or after PEAK_DETECTION_TIME
         auto beginIt = averagedData.begin();
         auto endit = beginIt + getBinForFrequency(getParameter(UPPER_THRESHOLD_FREQUENCY_ID));
         float heightThreshold = peakDectectionTime ? getParameter(PEAK_DETECTION_HEIGHT_THRESHOLD_ID) : getParameter(PEAK_TRACING_HEIGHT_THRESHOLD_ID);
         std::vector<Peak<float>*> peaks = PeakFinder::findPeaksThreshold(beginIt, endit, heightThreshold, timestamp);
         this->peakMatrix.push_back(peaks);
-        
+
         // trace the peaks
         this->tracePeaks(peaks, peakDectectionTime);
-        
+
         // remove the oldest fft result from the fftData vector to achieve a moving average
         fftData.erase(fftData.begin());
     }
@@ -345,13 +344,13 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
     bool peakDone = false;
     bool addedPeakToLast = false;
     bool addedPeakToCurrent = false;
-    
+
     // parameter values
     auto maxBinJump = getParameter(MAX_BIN_JUMP_ID);
     size_t broadestAllowedInterruption = (size_t) getParameter(BROADEST_ALLOWED_INTERRUPTION_ID);
-    
+
     std::vector<PeakHistory<float>> toInsert;
-    
+
     // iterate through the peaks and PeakHistories at the same time
     // invariant: both vectors are sorted by the position ascendingly
     for (auto peak : peaks) {
@@ -360,7 +359,7 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
             currentHistoryPosition = currentHist->getLast()->interpolatedPosition;
             lastDiff = fabs(peak->interpolatedPosition - lastHistoryPosition);
             currentDiff = fabs(peak->interpolatedPosition - currentHistoryPosition);
-            
+
             // if the peak is still between the two PeakHistories, try to associate it with one
             if (peak->interpolatedPosition < currentHistoryPosition) {
                 if (lastDiff <= maxBinJump || currentDiff <= maxBinJump) {  // the peak is near enough to one of the already existing peaks
@@ -385,23 +384,23 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
                 }
                 addedPeakToLast = addedPeakToCurrent;
                 addedPeakToCurrent = false;
-                
+
                 lastHistoryPosition = currentHistoryPosition;
                 lastHistory = currentHist;
                 ++currentHist;
             }
         }
-        
+
         if (!peakDone && allowNew) {
             toInsert.emplace_back(peak, broadestAllowedInterruption);
         }
     }
-    
+
     // kill remove peak histories which are not alive
     peakHistories.erase(std::remove_if(peakHistories.begin(), peakHistories.end(),
                                        [](PeakHistory<float> & elem) -> bool { return !elem.isAlive(); }),
                         peakHistories.end());
-    
+
     // insert new peaks into histories and keep them sorted
     peakHistories.insert(peakHistories.end(), toInsert.begin(), toInsert.end());
     std::sort(peakHistories.begin(), peakHistories.end(),
@@ -413,7 +412,7 @@ void DopplerSpeedCalculator::tracePeaks(const std::vector<Peak<float> *> &peaks,
 DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures() {
     // put the feature into the feature set
     FeatureSet fs;
-    
+
     if (peakHistories.empty()) {
         return fs;
     }
@@ -437,7 +436,7 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures(
         dominatingFrequencies.values = vector<float>(1, getFrequencyForBin(pos.second));
         fs[m_outputNumbers["dominating-frequencies"]].push_back(dominatingFrequencies);
     }
-    
+
     Feature speed;
     while (firstHist != peakHistories.end()) {
         auto approaching = firstHist->getStableBegin();
@@ -456,6 +455,3 @@ DopplerSpeedCalculator::FeatureSet DopplerSpeedCalculator::getRemainingFeatures(
 
     return fs;
 }
-
-
-

@@ -25,14 +25,14 @@ namespace PeakFinder {
         size_t position;
         double interpolatedPosition;
 
-        Peak<T>(): value(-1), height(-1), position(-1), interpolatedPosition(-1), timestamp(RealTime::zeroTime) {}
+        Peak<T>(): value(-1), timestamp(RealTime::zeroTime), height(-1), position(-1), interpolatedPosition(-1) {}
 
         Peak<T>(T value, T height, size_t position, double interpolatedPosition, _VampPlugin::Vamp::RealTime timestamp):
-            value(value), height(height), position(position), interpolatedPosition(interpolatedPosition), timestamp(timestamp) {}
-        
+            value(value), timestamp(timestamp), height(height), position(position), interpolatedPosition(interpolatedPosition) {}
+
         Peak<T>(const Peak<T> & other):
-            value(other.value), height(other.height), position(other.position), interpolatedPosition(other.interpolatedPosition),
-            timestamp(other.timestamp)
+            value(other.value), timestamp(other.timestamp), height(other.height), position(other.position),
+            interpolatedPosition(other.interpolatedPosition)
         { }
     };
 
@@ -63,7 +63,7 @@ std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin,
     T previous = *begin;
     T current;
     T height;
-    
+
     pair<size_t, T> lastValley = pair<size_t, T>(0, previous);
     PeakFinder::Peak<T> candidate;
     bool validCandidate = false;
@@ -86,7 +86,7 @@ std::vector<PeakFinder::Peak<T>*> PeakFinder::findPeaksThreshold(Iterator begin,
                 direction = SignalDirection::ascending;
                 lastValley.first = index - 1;
                 lastValley.second = previous;
-                
+
                 if (validCandidate) {
                     height = candidate.value - previous;
                     // if the height is sufficient, make the candidate a peak

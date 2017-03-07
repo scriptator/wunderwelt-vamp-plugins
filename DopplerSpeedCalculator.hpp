@@ -62,47 +62,47 @@ public:
     string getMaker() const;
     int getPluginVersion() const;
     string getCopyright() const;
-    
+
     InputDomain getInputDomain() const;
     size_t getPreferredBlockSize() const;
     size_t getPreferredStepSize() const;
     size_t getMinChannelCount() const;
     size_t getMaxChannelCount() const;
-    
+
     ParameterList getParameterDescriptors() const;
     float getParameter(string identifier) const;
     void setParameter(string identifier, float value);
-    
+
     ProgramList getPrograms() const;
     string getCurrentProgram() const;
     void selectProgram(string name);
-    
+
     OutputList getOutputDescriptors() const;
-    
+
     bool initialise(size_t channels, size_t stepSize, size_t blockSize);
     void reset();
-    
+
     FeatureSet process(const float *const *inputBuffers,
                        Vamp::RealTime timestamp);
-    
+
     FeatureSet getRemainingFeatures();
-    
+
     /// calculates the center frequency of a bin (i.e. the index of the bin or an interpolated value inbetween)
     template<typename T> float getFrequencyForBin(T bin) {
         return (1.0f * this->m_inputSampleRate * bin) / this->m_blockSize;
     };
-    
+
     /// calculates bin number of a given frequency
     template<typename T> size_t getBinForFrequency(T frequency) {
         return (1.0 * frequency * m_blockSize) / this->m_inputSampleRate;
     };
-    
+
     /// Calculates the normalized magnitude in dB given a complex number
     /// formula reference https://groups.google.com/d/msg/comp.dsp/cZsS1ftN5oI/rEjHXKTxgv8J
     template<typename T> float calcNormalizedMagnitude(std::complex<T> complexVal) {
         return normalizeMagnitude(std::abs(complexVal));
     };
-    
+
     /// Calculates the normalized magnitude in dB given the magnitude as a number
     /// formula reference https://groups.google.com/d/msg/comp.dsp/cZsS1ftN5oI/rEjHXKTxgv8J
     template<typename T> float normalizeMagnitude(T magnitude) {
@@ -117,13 +117,13 @@ private:
     size_t m_blockSize;
     mutable std::map<std::string, int> m_outputNumbers;
     std::map<std::string, float> m_parameterValues;
-    
+
     // contains the last few fft results which get averaged before finding peaks
     vector<vector<float>> fftData;
-    
+
     // function which traces peaks over time
     void tracePeaks(const std::vector<Peak<float> *> &peaks, bool allowNew);
-    
+
     // store the history of all found peaks
     std::vector<std::vector<Peak<float>*>> peakMatrix;
     std::vector<PeakHistory<float>> peakHistories;
