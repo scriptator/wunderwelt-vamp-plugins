@@ -3,7 +3,7 @@ VAMPSDK_DIR	:= ../../vamp-plugin-sdk
 
 ARCHFLAGS 	:= -mmacosx-version-min=10.7 -stdlib=libc++
 
-CXXFLAGS	:= -Wall -I$(VAMPSDK_DIR) -g -fPIC --std=c++11 $(ARCHFLAGS)
+CXXFLAGS	:= -Wall .O3 -I$(VAMPSDK_DIR) -g -fPIC --std=c++11 $(ARCHFLAGS)
 
 PLUGIN_LDFLAGS	:= -dynamiclib $(ARCHFLAGS) $(VAMPSDK_DIR)/libvamp-sdk.a -exported_symbols_list vamp-plugin.list -install_name wunderwelt-vamp-plugin.dylib
 
@@ -12,4 +12,3 @@ PLUGIN_EXT	:= .dylib
 MAKEFILE_EXT 	:= .osx
 
 include Makefile.inc
-
